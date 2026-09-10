@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { api, ApiError } from "@/lib/api";
-import { formatDateTime, formatKg, shortHash } from "@/lib/format";
+import { api } from "@/lib/api";
+import { formatDateTime, formatKg, materialEmoji, shortHash } from "@/lib/format";
+import { Emoji } from "@/app/Emoji";
+import { PageHeader } from "../_components/PageHeader";
+import { LoadError } from "../_components/LoadError";
 
 export const dynamic = "force-dynamic";
 
@@ -25,19 +28,10 @@ export default async function EventsPage({
       onlyQuarantined ? "quarantined=true&limit=200" : "limit=200",
     );
   } catch (error) {
-    const unauthorised = error instanceof ApiError && (error.status === 401 || error.status === 403);
     return (
       <main>
-        <h1>Weigh-ins</h1>
-        <p className="error">
-          {unauthorised ? (
-            <>
-              Not signed in. <Link href="/login">Sign in</Link> to see weigh-ins.
-            </>
-          ) : (
-            "Could not reach the backend."
-          )}
-        </p>
+        <PageHeader eyebrow="Field capture" title="Weigh-ins" />
+        <LoadError error={error} resource="weigh-ins" />
       </main>
     );
   }
@@ -46,20 +40,20 @@ export default async function EventsPage({
 
   return (
     <main>
-      <div className="page-head">
-        <div>
-          <p className="eyebrow">Field capture</p>
-          <h1>Weigh-ins</h1>
-        </div>
-        <div className="actions no-print">
-          <Link className="btn" href="/events">
-            All
-          </Link>
-          <Link className="btn" href="/events?quarantined=true">
-            Quarantined only
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Field capture"
+        title="Weigh-ins"
+        actions={
+          <nav className="segmented" aria-label="Filter weigh-ins">
+            <Link href="/events" aria-current={onlyQuarantined ? undefined : "true"}>
+              All
+            </Link>
+            <Link href="/events?quarantined=true" aria-current={onlyQuarantined ? "true" : undefined}>
+              Quarantined only
+            </Link>
+          </nav>
+        }
+      />
 
       <dl className="stats">
         <div className="stat">
@@ -98,6 +92,8 @@ export default async function EventsPage({
                 <th>Integrity</th>
                 <th>Failed checks</th>
                 <th>Batch</th>
+                <th className="no-print">Proof</th>
+                <th className="no-print">Reweigh</th>
               </tr>
             </thead>
             <tbody>
@@ -105,9 +101,11 @@ export default async function EventsPage({
                 const failed = (e.integrity?.findings ?? []).filter((f) => f.outcome === "fail");
                 return (
                   <tr key={e.id}>
-                    <td className="hash">{formatDateTime(e.capturedAt)}</td>
+                    <td className="meta">{formatDateTime(e.capturedAt)}</td>
                     <td className="num">{formatKg(e.weightKg)} kg</td>
-                    <td>{e.material}</td>
+                    <td>
+                      <Emoji>{materialEmoji(e.material)}</Emoji> {e.material}
+                    </td>
                     <td>
                       <span
                         className="pill"
@@ -132,6 +130,24 @@ export default async function EventsPage({
                         <Link href={`/batches/${e.batchId}`}>{e.batchId.slice(0, 8)}</Link>
                       ) : (
                         shortHash(null)
+                      )}
+                    </td>
+                    <td className="no-print">
+                      {e.quarantined ? (
+                        "—"
+                      ) : (
+                        <Link className="btn" href={`/events/${e.id}/proof`}>
+                          Proof
+                        </Link>
+                      )}
+                    </td>
+                    <td className="no-print">
+                      {e.quarantined ? (
+                        "—"
+                      ) : (
+                        <Link className="btn" href={`/reweigh?eventId=${e.id}`}>
+                          Reweigh
+                        </Link>
                       )}
                     </td>
                   </tr>

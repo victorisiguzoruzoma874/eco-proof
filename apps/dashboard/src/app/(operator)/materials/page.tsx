@@ -2,6 +2,10 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, ApiError, type CurrentUser, type Material } from "@/lib/api";
+import { materialEmoji } from "@/lib/format";
+import { Emoji } from "@/app/Emoji";
+import { PageHeader } from "../_components/PageHeader";
+import { LoadError } from "../_components/LoadError";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +118,7 @@ function messageOf(error: unknown): string {
   if (error instanceof ApiError) {
     return error.detail ?? `Request failed (${error.status}).`;
   }
-  return "Could not reach the backend.";
+  return "The backend did not respond, so nothing was changed.";
 }
 
 export default async function MaterialsPage({
@@ -141,8 +145,8 @@ export default async function MaterialsPage({
   } catch {
     return (
       <main>
-        <h1>Materials</h1>
-        <p className="error">Could not reach the backend.</p>
+        <PageHeader eyebrow="Catalogue" title="Materials" />
+        <LoadError error={error} resource="the material catalogue" />
       </main>
     );
   }
@@ -150,7 +154,7 @@ export default async function MaterialsPage({
   if (!viewer) {
     return (
       <main>
-        <h1>Materials</h1>
+        <PageHeader eyebrow="Catalogue" title="Materials" />
         <p className="error">
           Not signed in. <Link href="/login">Sign in</Link> to see the material catalogue.
         </p>
@@ -164,23 +168,17 @@ export default async function MaterialsPage({
 
   return (
     <main>
-      <div className="page-head">
-        <div>
-          <p className="eyebrow">Catalogue</p>
-          <h1>Materials</h1>
-        </div>
-      </div>
-
-      <p className="note">
-        A material <strong>code</strong> is signed into every weigh-in payload and hashed into the
-        Merkle root anchored on the ledger. It can never be renamed or deleted once a collector has
-        signed it — doing so would invalidate the audit report of every batch containing it. The{" "}
-        <strong>name</strong>, the field guidance and the <strong>products</strong> list are
-        presentation only and safe to change at any time — the products are what the capture apps
-        show a collector so they can tell what a code covers without knowing the resin names.
-        Retiring a material hides it from the capture apps and leaves every stored weigh-in
-        untouched.
-      </p>
+      <PageHeader eyebrow="Catalogue" title="Materials" />
+      <p className="page-intro">
+          A material <strong>code</strong> is signed into every weigh-in payload and hashed into the
+          Merkle root anchored on the ledger. It can never be renamed or deleted once a collector has
+          signed it — doing so would invalidate the audit report of every batch containing it. The{" "}
+          <strong>name</strong>, the field guidance and the <strong>products</strong> list are
+          presentation only and safe to change at any time — the products are what the capture apps
+          show a collector so they can tell what a code covers without knowing the resin names.
+          Retiring a material hides it from the capture apps and leaves every stored weigh-in
+          untouched.
+        </p>
 
       {error ? <p className="error">{error}</p> : null}
       {added ? <p className="note">Added {added}. It is now offered in the capture apps.</p> : null}
@@ -299,7 +297,9 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
           {materials.map((m) => (
             <tr key={m.code}>
               <td className="hash">{m.code}</td>
-              <td>{m.name}</td>
+              <td>
+                <Emoji>{materialEmoji(m.code)}</Emoji> {m.name}
+              </td>
               <td>{m.description ?? "—"}</td>
               <td>
                 {m.examples.length === 0

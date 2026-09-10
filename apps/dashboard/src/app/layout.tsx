@@ -1,29 +1,34 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ThemeToggle } from "./ThemeToggle";
 import { THEME_KEY } from "@/lib/theme";
-import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ProofChain — verified waste-to-credit",
-  description:
-    "Operator and auditor views over verified weigh-ins, sealed batches and Stellar-anchored proofs.",
+  title: "ProofChain",
+  description: "Verified waste collection, hub re-weighs, and household waste-credit wallets.",
 };
 
 /**
- * Applies a stored theme choice before the first paint.
+ * Applies a stored theme choice before the first paint — see the operator
+ * layout's `ThemeToggle` for what reads it back. Kept at the root, not
+ * `(operator)/layout.tsx`, because it only touches `data-theme` on `<html>`,
+ * which every route shares regardless of which section's stylesheet is
+ * active; `/requester/*` simply never renders a toggle or a dark palette,
+ * so the attribute sits there unused rather than causing any conflict.
  *
  * This has to be a blocking inline script in the head, not an effect: an effect
  * runs after React hydrates, by which point the browser has already painted the
- * page in the system theme. A reader who chose light on a dark machine would
- * see a dark flash on every navigation — worse on the audit report, which is
- * the page most likely to be read by someone we are trying to convince.
- *
- * Wrapped in try/catch because `localStorage` throws outright in some privacy
- * modes, and an exception here would abort the parser before the page renders.
+ * page in the system theme. Wrapped in try/catch because `localStorage` throws
+ * outright in some privacy modes, and an exception here would abort the parser
+ * before the page renders.
  */
 const applyStoredTheme = `try{var t=localStorage.getItem(${JSON.stringify(THEME_KEY)});if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
+/**
+ * Deliberately minimal: no nav, no stylesheet import. `(operator)/layout.tsx`
+ * and `requester/layout.tsx` are two unrelated visual systems for two
+ * unrelated audiences (see each file's own doc comment) — this root layout
+ * exists only because Next.js requires exactly one `<html>`/`<body>` pair,
+ * not because the two sections share any chrome.
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // suppressHydrationWarning: the script above sets `data-theme` on this
@@ -33,25 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: applyStoredTheme }} />
       </head>
-      <body>
-        <header className="topbar no-print">
-          <div className="topbar-inner">
-            <Link className="brand" href="/">
-              ProofChain <em>ledger</em>
-            </Link>
-            <div className="topbar-actions">
-              <nav className="links">
-                <Link href="/">Batches</Link>
-                <Link href="/events">Weigh-ins</Link>
-                <Link href="/materials">Materials</Link>
-                <Link href="/login">Sign in</Link>
-              </nav>
-              <ThemeToggle />
-            </div>
-          </div>
-        </header>
-        <div className="shell">{children}</div>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

@@ -1,0 +1,991 @@
+/*
+ * The requester's app: a different product for a different audience.
+ *
+ * The operator side (globals.css) is deliberately editorial — a ledger, not
+ * an admin panel. This side is the opposite on purpose: a consumer product a
+ * household member opens on their phone to book a pickup and watch a wallet
+ * balance grow. Warm surfaces, a bold display weight, tabular numerals on
+ * every amount, and a mobile-app layout (capped width, bottom tab bar) even
+ * though it renders in a desktop browser too.
+ *
+ * Scoped entirely under `.rq-shell` (applied once, in requester/layout.tsx)
+ * so nothing here can leak into `(operator)/globals.css` or vice versa —
+ * the two stylesheets never both apply to the same element.
+ */
+
+.rq-shell {
+  --rq-bg: #ffffff;
+  --rq-surface: #f5f3ec;
+  --rq-text: #0b0f0d;
+  --rq-text-soft: color-mix(in srgb, var(--rq-text) 60%, transparent);
+  --rq-text-faint: color-mix(in srgb, var(--rq-text) 45%, transparent);
+  --rq-divider: #d9d8d1;
+  --rq-accent: #0f6b45;
+  --rq-accent-2: #35b879;
+  --rq-accent-100: #e6f4ec;
+  --rq-accent-700: #0a4a30;
+  --rq-dark: #0b1f16;
+  --rq-dark-2: #123c2a;
+  --rq-bad: #a8261d;
+  --rq-bad-bg: #fbeae8;
+  --rq-radius-sm: 8px;
+  --rq-radius-md: 12px;
+  --rq-radius-lg: 16px;
+  --rq-shadow-sm: 0 1px 2px rgba(11, 31, 22, 0.06);
+  --rq-shadow-md: 0 6px 20px rgba(11, 31, 22, 0.08);
+
+  /*
+   * `--rq-font-display`/`--rq-font-sans` are injected by next/font in
+   * `requester/layout.tsx` — the same two faces the operator dashboard loads.
+   *
+   *   --rq-serif  Fraunces       the screen title. Nowhere else.
+   *   --rq-sans   IBM Plex Sans  everything else, every amount included.
+   *   --rq-mono   IBM Plex Mono  a redemption code, typed back in from a
+   *                              printed slip.
+   *
+   * Credits are a quantity, not a machine string: they are set in Plex Sans with
+   * `tabular-nums`, which is what keeps a column of amounts aligned.
+   */
+  --rq-serif: var(--rq-font-display), ui-serif, Georgia, "Iowan Old Style", serif;
+  --rq-sans: var(--rq-font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rq-mono: var(--rq-font-mono), ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  /* Sharp terminals, no swash alternates — see `--fraunces-axes` in the
+     operator stylesheet for why this product turns both axes off. */
+  --rq-fraunces-axes: "SOFT" 0, "WONK" 0;
+
+  /*
+   * The same scale as the operator dashboard and the landing site. This app
+   * used eleven ad hoc sizes; nothing here moves by more than half a pixel,
+   * but there is now one place to change a size rather than eleven.
+   */
+  --text-3xs: 0.625rem;
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-base: 1rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.25rem;
+  --text-display-4: clamp(1.6rem, 1.1rem + 1.7vw, 2.35rem);
+  --text-display-5: clamp(1.5rem, 1rem + 2vw, 2.4rem);
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--rq-bg);
+  color: var(--rq-text);
+  font-family: var(--rq-sans);
+  /* 15px, kept off the rem scale on purpose: this is a phone-first reading
+     surface and 16px root text pushes the card copy to two lines too often. */
+  font-size: 15px;
+  line-height: 1.45;
+  /* Fixed-width digits on every balance. The codes a requester reads off a
+     printed slip are disambiguated by Plex Mono itself, not by a sans feature —
+     same reasoning as the operator side. */
+  font-feature-settings: "tnum" 1;
+  font-synthesis: none;
+  font-optical-sizing: auto;
+}
+
+.rq-shell * {
+  box-sizing: border-box;
+}
+
+.rq-shell a {
+  color: var(--rq-accent);
+  text-decoration: none;
+}
+.rq-shell a:hover {
+  color: var(--rq-accent-700);
+}
+
+/*
+ * Mobile-first: nav renders as a fixed bottom bar (the standard pattern on a
+ * real phone — bottom-of-thumb-reach, no width to spare for a side panel).
+ * `@media (min-width: 860px)` below switches it to the left sidebar instead,
+ * once there's actually room for one. Same markup throughout — only CSS
+ * changes with viewport, no JS breakpoint logic.
+ */
+.rq-body {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rq-main {
+  flex: none;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 1rem calc(4.5rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 860px) {
+  .rq-body {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+  /*
+   * On a desktop the content fills the space left of the sidebar rather than
+   * staying at phone width — a 480px column marooned in the middle of a
+   * 1920px monitor reads as broken, not as deliberate. Capped at 1120px so
+   * line length stays readable on very wide displays, and centred within
+   * whatever room is left over.
+   */
+  .rq-main {
+    flex: 1;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 2rem 3rem;
+  }
+}
+
+/*
+ * Two-up section layout, used where a page has two independent blocks that
+ * both fit comfortably side by side once there's width for it (a form beside
+ * a list, two tables). Single column below the breakpoint — never a squeezed
+ * two-column layout on a phone.
+ */
+.rq-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 860px) {
+  .rq-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+    align-items: start;
+  }
+}
+
+.rq-hero {
+  background: var(--rq-dark);
+  color: #faf9f4;
+  /* Negative margin cancels `.rq-main`'s padding so the hero goes edge to
+     edge — it has to track that padding at each breakpoint (see below). */
+  margin: 0 -1rem;
+  padding: 2rem 1.25rem 1.75rem;
+  border-radius: 0;
+}
+/*
+ * The screen title, and the app's one use of the serif — the same face and the
+ * same job it has on the operator side. Fraunces is redrawn per size by its
+ * optical-size axis, so it holds at both of these scales and still never
+ * appears on a card heading.
+ */
+.rq-title {
+  font-family: var(--rq-serif);
+  font-variation-settings: var(--rq-fraunces-axes);
+  font-size: var(--text-display-4);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.rq-hero h1 {
+  font-family: var(--rq-serif);
+  font-variation-settings: var(--rq-fraunces-axes);
+  font-size: var(--text-display-5);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 1rem;
+  color: #faf9f4;
+  font-weight: 600;
+}
+
+@media (min-width: 860px) {
+  .rq-hero {
+    margin: 1.5rem 0 0;
+    padding: 2.25rem 2rem;
+    border-radius: var(--rq-radius-lg);
+  }
+}
+.rq-hero p {
+  color: rgba(250, 249, 244, 0.85);
+}
+
+/*
+ * The one label in this app set in capitals, matching the operator dashboard's
+ * page eyebrow: two or three words naming the screen, above the title, read
+ * once on arrival. Every other label here stays sentence case — a run of
+ * tracked capitals down a card is the slowest thing on a phone screen to read.
+ */
+.rq-eyebrow {
+  font-weight: 600;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rq-text-soft);
+  margin: 0 0 0.5rem;
+}
+.rq-hero .rq-eyebrow {
+  color: rgba(250, 249, 244, 0.62);
+}
+
+/*
+ * The balance is the one thing this app exists to show, so it is the one place
+ * that spends real size and weight. Everything around it is deliberately quiet
+ * — if a second element competed at this scale, neither would read as the
+ * answer to "how much do I have".
+ */
+.rq-balance {
+  font-weight: 800;
+  font-size: var(--text-display-4);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  margin: 0.5rem 0 0.125rem;
+}
+
+.rq-card {
+  border: 1px solid var(--rq-divider);
+  border-radius: var(--rq-radius-lg);
+  padding: 1rem 1.125rem;
+  background: var(--rq-bg);
+  box-shadow: var(--rq-shadow-sm);
+  margin-bottom: 1rem;
+}
+
+.rq-section {
+  padding: 1rem 0;
+  border-top: 1px solid var(--rq-divider);
+}
+.rq-section:first-child {
+  border-top: 0;
+}
+
+.rq-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rq-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 1.125rem;
+  border: 0;
+  border-radius: var(--rq-radius-md);
+  cursor: pointer;
+  font-weight: 800;
+  font-size: var(--text-base);
+  font-family: inherit;
+  transition: background 0.18s ease;
+  text-decoration: none;
+}
+/*
+ * The primary action: flat institutional green.
+ *
+ * The two sections keep separate stylesheets on purpose, but a primary button
+ * is the one component that should feel like the same object in both — a
+ * requester and an operator are looking at one product.
+ *
+ * This replaced a three-stop gloss ramp with a lit inner edge and a specular
+ * sweep on hover. It was a convincing physical button and the wrong one for a
+ * product about money moving — and having it here in gloss while the operator
+ * side went flat would have made two sections of one product disagree about
+ * what a primary button is.
+ */
+.rq-btn[data-variant="primary"] {
+  background: var(--rq-accent);
+  color: #fcfbf7;
+}
+.rq-btn[data-variant="primary"]:hover {
+  background: var(--rq-accent-700);
+}
+.rq-btn[data-variant="primary"]:active {
+  background: var(--rq-accent-700);
+}
+
+.rq-btn[data-variant="secondary"] {
+  background: transparent;
+  color: var(--rq-text);
+  border: 1px solid var(--rq-divider);
+  font-weight: 700;
+  min-height: 48px;
+}
+.rq-btn[data-variant="secondary"]:hover {
+  background: color-mix(in srgb, var(--rq-text) 6%, transparent);
+}
+.rq-btn[data-variant="on-dark"] {
+  background: #faf9f4;
+  color: var(--rq-dark);
+}
+.rq-btn[data-variant="on-dark"]:hover {
+  background: #fff;
+}
+.rq-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rq-pill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: var(--text-2xs);
+  background: var(--rq-accent-100);
+  color: var(--rq-accent-700);
+}
+.rq-pill[data-tone="neutral"] {
+  background: color-mix(in srgb, var(--rq-text) 8%, transparent);
+  color: var(--rq-text-soft);
+}
+.rq-pill[data-tone="bad"] {
+  background: var(--rq-bad-bg);
+  color: var(--rq-bad);
+}
+
+.rq-ledger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--rq-divider);
+}
+.rq-ledger-row:first-child {
+  border-top: 0;
+}
+.rq-ledger-row .rq-amount {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.rq-ledger-row .rq-amount[data-tone="in"] {
+  color: var(--rq-accent-700);
+}
+.rq-ledger-row .rq-amount[data-tone="out"] {
+  color: var(--rq-text-soft);
+}
+.rq-ledger-meta {
+  font-size: var(--text-xs);
+  color: var(--rq-text-faint);
+  margin-top: 0.15rem;
+}
+
+.rq-stat {
+  border: 1px solid var(--rq-divider);
+  border-radius: var(--rq-radius-md);
+  padding: 0.75rem;
+  background: var(--rq-bg);
+}
+.rq-stat b {
+  display: block;
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.rq-stat span {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--rq-text-soft);
+  margin-top: 0.25rem;
+}
+
+.rq-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--rq-divider);
+  border-radius: 10px;
+  overflow: hidden;
+  flex: none;
+}
+.rq-stepper button {
+  width: 34px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: var(--text-base);
+  font-family: inherit;
+}
+.rq-stepper button:hover {
+  background: color-mix(in srgb, var(--rq-text) 8%, transparent);
+}
+.rq-stepper button:first-child {
+  border-right: 1px solid var(--rq-divider);
+}
+.rq-stepper button:last-child {
+  border-left: 1px solid var(--rq-divider);
+}
+.rq-stepper output {
+  min-width: 64px;
+  text-align: center;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.rq-field {
+  display: block;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
+.rq-field input,
+.rq-field select,
+.rq-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 0.375rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--rq-divider);
+  border-radius: var(--rq-radius-sm);
+  font: inherit;
+  font-size: var(--text-md);
+  background: var(--rq-bg);
+  color: var(--rq-text);
+}
+.rq-field textarea {
+  min-height: 4rem;
+  padding: 0.6rem 0.75rem;
+}
+
+/*
+ * A redemption code is a machine string — read off a printed QR slip and typed
+ * in, character by character, usually once and under mild irritation. Mono and
+ * tracked out so 0/O and 1/I cannot be confused while typing, and so a typo is
+ * visible before the form is submitted rather than after it is rejected.
+ *
+ * The capitals here are the code's own, not a label's: codes are issued
+ * uppercase, and `text-transform` only saves the person from a failed submit
+ * for typing what they see in lower case.
+ */
+.rq-code-input {
+  font-family: var(--rq-mono) !important;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.rq-field input:focus,
+.rq-field select:focus,
+.rq-field textarea:focus {
+  outline: 2px solid var(--rq-accent);
+  outline-offset: 1px;
+}
+
+.rq-error {
+  border: 1px solid color-mix(in srgb, var(--rq-bad) 40%, transparent);
+  background: var(--rq-bad-bg);
+  color: var(--rq-bad);
+  border-radius: var(--rq-radius-md);
+  padding: 0.75rem 1rem;
+  font-size: var(--text-sm);
+  margin-bottom: 1rem;
+}
+.rq-note {
+  background: var(--rq-accent-100);
+  color: var(--rq-accent-700);
+  border-radius: var(--rq-radius-md);
+  padding: 0.75rem 1rem;
+  font-size: var(--text-sm);
+  margin-bottom: 1rem;
+}
+
+/*
+ * Mobile base: fixed bottom bar, icon-row style. `.rq-nav-brand` (the
+ * logo+wordmark) is hidden here on purpose — there's no room for it next to
+ * four labelled tabs at phone width, and a bottom bar showing a brand mark
+ * would be unusual for the pattern anyway (no app's bottom tab bar does this).
+ */
+.rq-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 0;
+  width: 100%;
+  padding: 0.375rem 0.5rem calc(0.375rem + env(safe-area-inset-bottom));
+  background: var(--rq-dark);
+  box-shadow: 0 -1px 0 rgba(250, 249, 244, 0.1);
+}
+
+.rq-nav-brand {
+  display: none;
+}
+.rq-nav-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--rq-accent-2);
+  font-size: var(--text-xs);
+}
+.rq-nav-word {
+  font-weight: 800;
+  font-size: var(--text-sm);
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.rq-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5rem 0.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.005em;
+  color: rgba(250, 249, 244, 0.76);
+  border-left: 0;
+  text-decoration: none;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+.rq-tab:hover {
+  background: rgba(53, 184, 121, 0.14);
+  color: #fff;
+}
+.rq-tab[data-active="true"] {
+  color: #fff;
+  background: rgba(53, 184, 121, 0.16);
+  font-weight: 800;
+}
+
+/* Desktop/tablet: the fixed bottom bar becomes a sticky left sidebar with
+   room for the brand header, matching the wider "professional" chrome. */
+@media (min-width: 860px) {
+  .rq-tabs {
+    position: sticky;
+    top: 0;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    align-self: stretch;
+    flex: none;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.125rem;
+    width: 190px;
+    padding: 1.5rem 0.75rem;
+    box-shadow: none;
+  }
+  .rq-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem 1.25rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(250, 249, 244, 0.12);
+  }
+  .rq-tab {
+    flex: none;
+    display: block;
+    text-align: left;
+    padding: 0.65rem 0.75rem;
+    margin: 0 -0.25rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: var(--text-xs);
+    letter-spacing: 0;
+    text-transform: none;
+    border-left: 3px solid transparent;
+  }
+  .rq-tab[data-active="true"] {
+    border-left-color: var(--rq-accent-2);
+  }
+}
+
+.rq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+/*
+ * `padding: 0.5rem 0` gave the columns no horizontal gutter at all, so "Est.
+ * weight" and "Status" ran into each other as one word in the head and the
+ * cells under them touched. The gutter is on the inline edges between cells,
+ * not on the outer ones, so the table still starts and ends flush with the
+ * text beside it.
+ */
+.rq-table th,
+.rq-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-top: 1px solid var(--rq-divider);
+}
+
+.rq-table th:last-child,
+.rq-table td:last-child {
+  padding-right: 0;
+}
+.rq-table thead th {
+  border-top: 0;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rq-text-faint);
+  font-weight: 600;
+  /* Deliberately allowed to wrap. `nowrap` reads better on a wide screen, but
+     it pushes this five-column table past 390px on a phone — and the collision
+     it was guarding against was the missing column gutter above, not wrapping. */
+}
+.rq-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Welcome screen (requester/page.tsx): links inherit the shell's green
+   `.rq-shell a` color everywhere else, but that fails contrast on the
+   `.rq-hero`'s dark background, so it's overridden just within the hero. */
+.rq-hero a {
+  color: #faf9f4;
+  text-decoration: underline;
+}
+.rq-hero a:hover {
+  color: var(--rq-accent-2);
+}
+
+.rq-steps {
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+.rq-steps li {
+  font-size: var(--text-md);
+  line-height: 1.45;
+  color: rgba(250, 249, 244, 0.9);
+}
+.rq-steps strong {
+  color: #faf9f4;
+}
+
+/* ==========================================================================
+ * Motion.
+ *
+ * This is the consumer half of the product, so it gets more personality than
+ * the operator side: spring easing on anything the thumb touches, a press
+ * that actually presses, and a screen that assembles itself rather than
+ * appearing all at once. The ceiling is still "premium", not "playful" —
+ * every distance here is under 10px and every duration under half a second,
+ * so the motion reads as physics rather than as an effect.
+ *
+ * Everything below is scoped `.rq-shell …` so it outranks the base rules it
+ * extends (notably `.rq-btn`'s and `.rq-tab`'s existing `transition`, which
+ * these deliberately supersede rather than fight) without touching them.
+ *
+ * NOTE: entrance animations all use `animation-fill-mode: backwards`, never
+ * `both`. `both` would leave the final keyframe applied forever, and an
+ * animation's declarations outrank a plain `:hover` rule — the card lifts
+ * further down would silently stop working. `backwards` only borrows the
+ * first keyframe during the delay and lets the element fall back to its own
+ * rules once it has finished.
+ * ========================================================================== */
+
+@keyframes rq-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Cards and sections fade up in document order, so a screen resolves top to
+ * bottom the way it would if it were being laid down by hand. 50ms apart is
+ * enough to read as a sequence without the last item feeling late; capped at
+ * six steps so a long page never leaves content waiting.
+ */
+.rq-shell .rq-card,
+.rq-shell .rq-section {
+  animation: rq-rise-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.rq-shell .rq-card:nth-child(2),
+.rq-shell .rq-section:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.rq-shell .rq-card:nth-child(3),
+.rq-shell .rq-section:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.rq-shell .rq-card:nth-child(4),
+.rq-shell .rq-section:nth-child(4) {
+  animation-delay: 0.15s;
+}
+.rq-shell .rq-card:nth-child(5),
+.rq-shell .rq-section:nth-child(5) {
+  animation-delay: 0.2s;
+}
+.rq-shell .rq-card:nth-child(n + 6),
+.rq-shell .rq-section:nth-child(n + 6) {
+  animation-delay: 0.25s;
+}
+
+/*
+ * A card inside a section is already being moved by its parent — animating it
+ * too doubles the travel and reads as a stutter. The section owns the
+ * entrance; the card just rides along.
+ */
+.rq-shell .rq-section .rq-card,
+.rq-shell .rq-section .rq-note {
+  animation: none;
+}
+
+/* Standalone notices (the wallet's "Credited!" confirmation, a form error)
+   arrive after a redirect, so they are genuinely new content and worth the
+   same small entrance. */
+.rq-shell .rq-note,
+.rq-shell .rq-error {
+  animation: rq-rise-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/*
+ * Buttons. The base rule only transitions `background`; this adds the lift
+ * and the press. `:not(:disabled)` keeps the disabled submit button on
+ * /requester/request inert — it still looks unavailable when hovered.
+ * The press deliberately uses a much shorter duration than the release: a
+ * button that squashes lazily feels broken, one that springs back feels
+ * physical.
+ *
+ * No arrow nudge: the primary buttons in this section are plain text labels
+ * ("Request a pickup", "Cash out", "Redeem") with no trailing "→" in the
+ * markup and no ::after glyph to move, so there is nothing to animate
+ * without editing JSX.
+ */
+.rq-shell .rq-btn {
+  transition:
+    background 0.18s ease,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s ease;
+}
+.rq-shell .rq-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--rq-shadow-md);
+}
+.rq-shell .rq-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+  box-shadow: var(--rq-shadow-sm);
+  transition-duration: 0.06s;
+}
+
+/*
+ * The balance is the number the whole app exists to grow, so it gets the one
+ * genuinely showy moment: a short scale-and-settle on mount. Purely
+ * decorative — the figure is fully rendered server-side, this is not a
+ * counter and never displays an intermediate value.
+ */
+@keyframes rq-balance-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rq-shell .rq-balance {
+  animation: rq-balance-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+}
+
+/*
+ * Nav. Two layouts, one set of rules:
+ *
+ *  - Bottom bar (< 860px): the active tab grows a small underline via
+ *    `::after`, which scales in from the centre. Hover lifts the tab
+ *    slightly; press flattens it back.
+ *  - Left sidebar (>= 860px): the existing `border-left` IS the active
+ *    indicator, so the underline is dropped there and the border colour
+ *    fades instead. Hover slides right rather than up, matching the axis of
+ *    the list.
+ *
+ * Both extend the base `.rq-tab` transition rather than replacing its
+ * background/colour timings, so the existing hover tint still behaves.
+ */
+.rq-shell .rq-tab {
+  position: relative;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.24s ease;
+}
+.rq-shell .rq-tab::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--rq-accent-2);
+  opacity: 0;
+  transform: translateX(-50%) scaleX(0);
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.2s ease;
+}
+.rq-shell .rq-tab[data-active="true"]::after {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1);
+}
+.rq-shell .rq-tab:hover {
+  transform: translateY(-2px);
+}
+.rq-shell .rq-tab:active {
+  transform: translateY(0) scale(0.96);
+  transition-duration: 0.06s;
+}
+
+@media (min-width: 860px) {
+  /* The sidebar already has a border-left indicator — a second underline
+     would be two answers to one question. */
+  .rq-shell .rq-tab::after {
+    display: none;
+  }
+  .rq-shell .rq-tab:hover {
+    transform: translateX(3px);
+  }
+  .rq-shell .rq-tab:active {
+    transform: translateX(1px) scale(0.99);
+    transition-duration: 0.06s;
+  }
+}
+
+/*
+ * Pills. Only the neutral tone breathes — that tone is exactly the set of
+ * in-flight states (requested / assigned / collected, and a withdrawal held
+ * `pending`). "Redeemed" and "cancelled" are settled and stay still, so the
+ * motion means something: it marks the rows still waiting on someone.
+ *
+ * A halo rather than a colour or size change, so it cannot shift a table
+ * row's metrics, and offset on alternating rows so a column of them never
+ * pulses in lockstep (which reads as a rendering glitch, not as life).
+ */
+@keyframes rq-pill-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(11, 31, 22, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(11, 31, 22, 0.07);
+  }
+}
+.rq-shell .rq-pill[data-tone="neutral"] {
+  animation: rq-pill-breathe 2.6s ease-in-out infinite;
+}
+.rq-shell tr:nth-child(even) .rq-pill[data-tone="neutral"] {
+  animation-delay: -1.3s;
+}
+
+/*
+ * The QR cards on /requester/dashboard — "your material is weighed, this code
+ * is money". Matched by `:has(> img)` because that is what makes them a QR
+ * card; no other `.rq-card` in this section takes a direct image child, and
+ * this needs no markup change to stay accurate.
+ */
+.rq-shell .rq-card:has(> img) {
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease;
+}
+.rq-shell .rq-card:has(> img):hover {
+  transform: translateY(-4px);
+  box-shadow: var(--rq-shadow-md);
+}
+
+/* A card that is itself a link (the dashboard's wallet-balance tile) should
+   advertise that it is one. */
+.rq-shell a.rq-card {
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease,
+    border-color 0.2s ease;
+}
+.rq-shell a.rq-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--rq-shadow-md);
+  border-color: var(--rq-accent-2);
+}
+
+/* The +/- steppers are the most-tapped controls in the app; a real squash on
+   press is what makes repeated tapping feel responsive rather than laggy. */
+.rq-shell .rq-stepper button {
+  transition:
+    background 0.14s ease,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.rq-shell .rq-stepper button:active {
+  transform: scale(0.86);
+  transition-duration: 0.06s;
+}
+
+/*
+ * The OS-level opt-out, covering every rule above.
+ *
+ * Removed outright rather than shortened: persistent motion (the pill's
+ * breathing halo especially) is a real trigger for vestibular disorders, and
+ * none of the motion here carries information a user would lose — the active
+ * tab still has its background and border, the pending pill still has its
+ * colour, the cards are still all present. Only the decoration goes.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .rq-shell .rq-card,
+  .rq-shell .rq-section,
+  .rq-shell .rq-note,
+  .rq-shell .rq-error,
+  .rq-shell .rq-balance,
+  .rq-shell .rq-btn,
+  .rq-shell .rq-tab,
+  .rq-shell .rq-tab::after,
+  .rq-shell .rq-pill[data-tone="neutral"],
+  .rq-shell tr:nth-child(even) .rq-pill[data-tone="neutral"],
+  .rq-shell .rq-card:has(> img),
+  .rq-shell a.rq-card,
+  .rq-shell .rq-stepper button {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Hover/press states keep their colour changes but lose all displacement. */
+  .rq-shell .rq-btn:hover:not(:disabled),
+  .rq-shell .rq-btn:active:not(:disabled),
+  .rq-shell .rq-tab:hover,
+  .rq-shell .rq-tab:active,
+  .rq-shell .rq-card:has(> img):hover,
+  .rq-shell a.rq-card:hover,
+  .rq-shell .rq-stepper button:active {
+    transform: none;
+  }
+
+  /* The tab underline is an indicator, not decoration, so it stays — it just
+     appears instead of scaling in. */
+  .rq-shell .rq-tab::after {
+    transform: translateX(-50%) scaleX(1);
+  }
+  .rq-shell .rq-tab:not([data-active="true"])::after {
+    opacity: 0;
+  }
+}

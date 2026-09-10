@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { api, ApiError, BACKEND_URL } from "@/lib/api";
-import { formatDateTime, formatKg, shortHash } from "@/lib/format";
+import { formatCurrency, formatDateTime, formatKg, materialEmoji, shortHash } from "@/lib/format";
+import { Emoji } from "@/app/Emoji";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
  *
  * This page is the product. It is laid out to be printed to PDF and handed to a
  * PRO, verifier or credit buyer, so it states its own provenance, shows the
- * arithmetic, and is explicit about what the Stellar anchor does and does not
+ * arithmetic, and is explicit about what the Merkle proof does and does not
  * prove. Overclaiming here is the fastest way to lose a verifier's trust.
  */
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
@@ -50,21 +51,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   }
 
   const internallyConsistent = report.proof.rootMatchesSealedValue && report.proof.allProofsValid;
-  const ledgerSays = report.onChain?.ledgerConfirmation.rootMatchesLedger ?? null;
 
-  /**
-   * "Verified" now requires the ledger to have said so, not merely for our own
-   * database to hold an anchor row. The previous rule showed "independently
-   * verifiable against the Stellar ledger" on the strength of a record we
-   * wrote ourselves — the exact claim a buyer is here to avoid taking on trust.
-   */
   const proofState = !report.proof.merkleRoot
     ? "pending"
-    : !internallyConsistent || ledgerSays === false
+    : !internallyConsistent
       ? "broken"
-      : ledgerSays === true
-        ? "verified"
-        : "pending";
+      : "verified";
 
   // The photo URLs in the report are relative to the backend, not to the
   // dashboard, so they need the same origin the download links use.
@@ -103,7 +95,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <dl className="stats">
         <div className="stat">
           <dt>Material</dt>
-          <dd style={{ fontSize: "1.25rem" }}>{report.batch.material}</dd>
+          <dd style={{ fontSize: "1.25rem" }}>
+            <Emoji>{materialEmoji(report.batch.material)}</Emoji> {report.batch.material}
+          </dd>
         </div>
         <div className="stat">
           <dt>Weigh-ins</dt>
@@ -130,16 +124,10 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <div className="proof" data-state={proofState}>
         <h3>
           {proofState === "verified"
-            ? "Independently verifiable against the Stellar ledger"
-            : proofState === "pending"
-              ? report.onChain
-                ? "Anchored — awaiting confirmation from the Stellar ledger"
-                : "Sealed and internally consistent — not yet anchored on-chain"
-              : proofState === "broken"
-                ? ledgerSays === false
-                  ? "LEDGER DISAGREES — do not rely on this batch"
-                  : "INCONSISTENT — do not rely on this batch"
-                : "Not sealed"}
+            ? "Sealed and internally consistent"
+            : proofState === "broken"
+              ? "INCONSISTENT — do not rely on this batch"
+              : "Not sealed"}
         </h3>
         <dl>
           <dt>Sealed root</dt>
@@ -156,34 +144,6 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <dd>{report.proof.nodeHashAlgorithm}</dd>
           <dt>Ordering</dt>
           <dd>{report.proof.ordering}</dd>
-          {report.onChain ? (
-            <>
-              <dt>Network</dt>
-              <dd>Stellar {report.onChain.network}</dd>
-              <dt>Transaction</dt>
-              <dd>
-                <a href={report.onChain.explorerUrl} target="_blank" rel="noreferrer noopener">
-                  {report.onChain.stellarTxHash}
-                </a>
-              </dd>
-              <dt>Ledger</dt>
-              <dd>{report.onChain.stellarLedger}</dd>
-              <dt>Data entry</dt>
-              <dd>{report.onChain.dataEntryKey}</dd>
-              <dt>Anchored at</dt>
-              <dd>{formatDateTime(report.onChain.anchoredAt)}</dd>
-              <dt>Ledger says</dt>
-              <dd>
-                {ledgerSays === true
-                  ? "root confirmed on-chain"
-                  : ledgerSays === false
-                    ? "ROOT NOT FOUND ON-CHAIN"
-                    : "not confirmed — Horizon unreachable"}
-                {" · checked "}
-                {formatDateTime(report.onChain.ledgerConfirmation.checkedAt)}
-              </dd>
-            </>
-          ) : null}
         </dl>
       </div>
 
@@ -259,7 +219,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             <tbody>
               {report.chainOfCustody.map((t) => (
                 <tr key={t.id}>
-                  <td className="hash">{formatDateTime(t.transferredAt)}</td>
+                  <td className="meta">{formatDateTime(t.transferredAt)}</td>
                   <td>{t.fromParty}</td>
                   <td>{t.toParty}</td>
                   <td className="num">{formatKg(t.weightInKg)}</td>
@@ -375,6 +335,88 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         </table>
       </div>
 
+      <h2>Hub re-weighs</h2>
+      {report.reweighs.length === 0 ? (
+        <p className="empty">No weigh-ins in this batch have been re-weighed at a hub yet.</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Weigh-in</th>
+                <th className="num">Claimed</th>
+                <th className="num">Verified</th>
+                <th className="num">Variance</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.reweighs.map((r) => (
+                <tr key={r.eventId}>
+                  <td className="hash">{shortHash(r.eventId, 8)}</td>
+                  <td className="num">{formatKg(r.claimedWeightKg)} kg</td>
+                  <td className="num">{formatKg(r.verifiedWeightKg)} kg</td>
+                  <td className="num">{r.variancePct}%</td>
+                  <td>
+                    <span
+                      className="pill"
+                      data-tone={
+                        r.status === "verified"
+                          ? "verified"
+                          : r.status === "flagged"
+                            ? "pending"
+                            : "broken"
+                      }
+                    >
+                      {r.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h2>Payouts</h2>
+      {report.payouts.length === 0 ? (
+        <p className="empty">No payouts have been recorded against this batch's reweighs yet.</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Collector</th>
+                <th className="num">Amount</th>
+                <th>Method</th>
+                <th>Status</th>
+                <th>Paid at</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.payouts.map((p) => (
+                <tr key={p.id}>
+                  <td className="hash">{shortHash(p.collectorId, 8)}</td>
+                  <td className="num">{formatCurrency(p.amount, p.currency)}</td>
+                  <td>{p.method}</td>
+                  <td>
+                    <span
+                      className="pill"
+                      data-tone={
+                        p.status === "paid" ? "verified" : p.status === "failed" ? "broken" : "pending"
+                      }
+                    >
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="meta">{formatDateTime(p.paidAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <h2>Basis of attestation</h2>
       <ol className="note" style={{ paddingLeft: "1.25rem", display: "grid", gap: "0.5rem" }}>
         {report.attestationNotes.map((note) => (
@@ -386,10 +428,10 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         className="note"
         style={{ marginTop: "2rem", borderTop: "1px solid var(--rule)", paddingTop: "1rem" }}
       >
-        To verify independently: recompute each leaf as sha256(0x00 ‖ payloadHash), combine pairs as
-        sha256(0x01 ‖ left ‖ right) in the stated order, and compare the resulting root against the
-        memo hash of the Stellar transaction above. The full event list, including every payload
-        hash, is available as CSV and JSON without an account.
+        To verify independently: recompute each leaf as sha256(0x00 ‖ payloadHash) and combine
+        pairs as sha256(0x01 ‖ left ‖ right) in the stated order — the result should match the
+        sealed root above. The full event list, including every payload hash, is available as CSV
+        and JSON without an account.
       </p>
     </main>
   );

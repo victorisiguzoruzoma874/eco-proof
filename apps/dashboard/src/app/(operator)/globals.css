@@ -1,0 +1,1767 @@
+/*
+ * ProofChain Ledger — the operator/auditor design system.
+ *
+ * The audience is an operator reconciling weights and an auditor deciding
+ * whether to believe us, so the register is institutional financial software:
+ * warm paper ground, borders instead of shadows, tabular figures on every
+ * amount, and colour reserved strictly for state. The serif carries the brand
+ * in the wordmark and the page title and appears nowhere else; Plex Sans carries
+ * the product.
+ *
+ * Every token this section uses is declared in this block. Component rules
+ * below may not invent a colour, a size, or a spacing value.
+ */
+
+:root {
+  /* ---- surfaces and ink ------------------------------------------------ */
+  --paper: #f7f5ef;
+  /* A second ground, half a step down, for rows and wells that need to sit
+     behind the card surface without becoming a different material. */
+  --paper-sunk: #f5f3ed;
+  --surface: #fcfbf7;
+  --ink: #171714;
+  --ink-soft: #6f6b63;
+  --ink-faint: #8b877f;
+  --rule: #d9d5cc;
+  /* The heavy rule is now reserved for table head underlines and print. The
+     2px black divider it used to draw under every page title is gone — see
+     `.page-head`. */
+  --rule-strong: #b9b3a7;
+
+  /* ---- state ------------------------------------------------------------
+   * Three tones, and each one means exactly one thing:
+   *   verified  settled, reconciled, paid
+   *   pending   someone still has to act
+   *   broken    rejected, failed, unreachable
+   * `--accent` is the same green as `verified` on purpose: the institutional
+   * green marks both "this is done" and "this is the action that does it".
+   */
+  --verified: #315c45;
+  --verified-bg: #e8f0ea;
+  --pending: #8a6410;
+  --pending-bg: #f5eddb;
+  --broken: #a6532a;
+  --broken-bg: #f1e5da;
+
+  --accent: #315c45;
+  --accent-bg: #e8f0ea;
+  --accent-deep: #234533;
+  /*
+   * Text on a filled green button. It is a token rather than a literal because
+   * it has to invert with the theme: the dark palette lifts `--accent` to a
+   * mid-sage so it can hold its own against a near-black ground, and near-white
+   * text on that measures about 2.3:1. The dark ground reads about 7:1 on it.
+   */
+  --on-accent: #fcfbf7;
+
+  --category-airtime: #2b6e8f;
+  --category-discount: #8a6410;
+  --category-goods: #315c45;
+
+  /* ---- type -------------------------------------------------------------
+   * `--font-display`/`--font-sans` are injected by next/font in
+   * `(operator)/layout.tsx`; the fallbacks keep the page readable if a face
+   * fails to load rather than dropping to an unrelated default.
+   *
+   *   --serif  Fraunces        the wordmark and the page title. Nowhere else.
+   *   --sans   IBM Plex Sans   everything else, every figure included.
+   *   --mono   IBM Plex Mono   machine strings only: Merkle roots, transaction
+   *                            hashes, ledger sequences, keys.
+   *
+   * The sans and the mono are siblings by design, and that is the point of
+   * choosing Plex over a pair drawn by different hands: a hash and the weight
+   * beside it share a skeleton, so a row reads as one instrument rather than as
+   * two fonts meeting. An amount is NOT a machine string — quantities are set
+   * in the sans with `tabular-nums`, which is what actually holds a column in
+   * line; the mono is reserved for strings a person checks against another copy
+   * character by character.
+   */
+
+  /*
+   * Type scale. Every font-size in this file resolves to one of these; a rule
+   * that needs a size not on the scale is a rule that needs rethinking.
+   */
+  --text-3xs: 0.6875rem; /* 11px  table heads, badges */
+  --text-2xs: 0.75rem; /*  12px  eyebrow, metadata */
+  --text-xs: 0.8125rem; /* 13px  nav, buttons, dense table body */
+  --text-sm: 0.875rem; /*  14px  table body, form controls */
+  --text-md: 0.9375rem; /* 15px  intro copy */
+  --text-base: 1rem; /*    16px  body */
+  --text-lg: 1.125rem; /*  18px */
+  --text-xl: 1.25rem; /*   20px  section heading */
+  --text-2xl: 1.5rem; /*   24px  large section heading */
+  --text-metric: 2rem; /*  32px  metric figures */
+
+  /*
+   * The page title, and the only fluid size here. 38px on a phone, 54px from
+   * about 1200px up — the brief's 48–56px band, reached by viewport rather
+   * than by a breakpoint step so it never lands mid-word on an odd width.
+   */
+  --text-display: clamp(2.375rem, 1.6rem + 2.6vw, 3.375rem);
+
+  /* ---- spacing ----------------------------------------------------------
+   * One scale, 4 through 64. Component rules use these names; a raw pixel or
+   * rem gap in a rule below is a bug, not a decision.
+   */
+  --space-1: 0.25rem; /*  4 */
+  --space-2: 0.5rem; /*   8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /*    16 */
+  --space-6: 1.5rem; /*  24 */
+  --space-8: 2rem; /*    32 */
+  --space-10: 2.5rem; /* 40 */
+  --space-12: 3rem; /*   48 */
+  --space-16: 4rem; /*   64 */
+
+  /*
+   * Fraunces' two personality axes, pinned once.
+   *
+   *   SOFT 0   sharp terminals rather than rounded ones
+   *   WONK 0   the upright `g` and straight-legged `a`, not the swash forms
+   *
+   * Both defaults exist and both are charming; both are wrong here. This is a
+   * screen where an auditor decides whether to believe a tonnage, and the
+   * wonky alternates read as a magazine having fun. The face keeps its warmth
+   * through its optical sizing and its slightly flared stems, which is as much
+   * personality as this product should carry.
+   */
+  --fraunces-axes: "SOFT" 0, "WONK" 0;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+
+  /*
+   * Content width and page padding. 1160px keeps a seven-column ledger table
+   * readable without letting it stretch across a 27-inch monitor; the gutter
+   * walks 20px (phone) → 32px (tablet) → 48px (desktop) on its own.
+   */
+  --measure: 1160px;
+  --gutter: clamp(1.25rem, 0.55rem + 2.2vw, 3rem);
+
+  /* One duration and one curve for the whole section. */
+  --duration: 160ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/*
+ * The dark values, named once.
+ *
+ * Two selectors can apply them — the system preference, and an explicit choice
+ * from the theme toggle — and a palette written out twice is a palette that
+ * drifts. Only the mapping is repeated below; the colours live here alone.
+ *
+ * This is a dark institutional palette, not an inversion: the ground is a
+ * green-shifted charcoal rather than neutral grey, the state tints stay dark
+ * and desaturated so a badge never glows, and the greens lift enough to hold
+ * 4.5:1 on that ground.
+ */
+:root {
+  --dark-paper: #101411;
+  --dark-paper-sunk: #0c0f0d;
+  --dark-surface: #151a17;
+  --dark-ink: #f2f0e8;
+  --dark-ink-soft: #a9aaa1;
+  --dark-ink-faint: #85867e;
+  --dark-rule: #2b322d;
+  --dark-rule-strong: #3d453f;
+
+  --dark-verified: #6d9c7d;
+  --dark-verified-bg: #16241b;
+  --dark-pending: #cc9b4a;
+  --dark-pending-bg: #241d10;
+  --dark-broken: #d98a63;
+  --dark-broken-bg: #2a1a12;
+
+  --dark-accent: #6d9c7d;
+  --dark-accent-bg: #16241b;
+  --dark-accent-deep: #86b294;
+  --dark-on-accent: #101411;
+}
+
+/*
+ * Three states, deliberately. No attribute means "follow the system", which is
+ * the default a reader never chose and should keep working. An explicit choice
+ * stamps [data-theme] and must win in both directions — including choosing dark
+ * on a machine set to light, which the media query alone cannot express.
+ *
+ * `color-scheme` is set alongside so native UI — scrollbars, the date control
+ * in the events filter, form fields — follows the theme too. Without it those
+ * stay light on a dark page and read as rendering bugs.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --paper: var(--dark-paper);
+    --surface: var(--dark-surface);
+    --ink: var(--dark-ink);
+    --ink-soft: var(--dark-ink-soft);
+    --ink-faint: var(--dark-ink-faint);
+    --rule: var(--dark-rule);
+    --rule-strong: var(--dark-rule-strong);
+
+    --verified: var(--dark-verified);
+    --verified-bg: var(--dark-verified-bg);
+    --pending: var(--dark-pending);
+    --pending-bg: var(--dark-pending-bg);
+    --broken: var(--dark-broken);
+    --broken-bg: var(--dark-broken-bg);
+    --accent: var(--dark-accent);
+
+    --paper-sunk: var(--dark-paper-sunk);
+    --accent-bg: var(--dark-accent-bg);
+    --accent-deep: var(--dark-accent-deep);
+    --on-accent: var(--dark-on-accent);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --paper: var(--dark-paper);
+  --surface: var(--dark-surface);
+  --ink: var(--dark-ink);
+  --ink-soft: var(--dark-ink-soft);
+  --ink-faint: var(--dark-ink-faint);
+  --rule: var(--dark-rule);
+  --rule-strong: var(--dark-rule-strong);
+
+  --verified: var(--dark-verified);
+  --verified-bg: var(--dark-verified-bg);
+  --pending: var(--dark-pending);
+  --pending-bg: var(--dark-pending-bg);
+  --broken: var(--dark-broken);
+  --broken-bg: var(--dark-broken-bg);
+  --accent: var(--dark-accent);
+
+  --paper-sunk: var(--dark-paper-sunk);
+  --accent-bg: var(--dark-accent-bg);
+  --accent-deep: var(--dark-accent-deep);
+  --on-accent: var(--dark-on-accent);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/*
+ * The type tokens live here, not on `:root`, because `--font-display` and
+ * --font-sans` are declared by next/font on THIS element — the wrapper in
+ * `layout.tsx` — and a custom property is only visible to the element that
+ * declares it and its descendants.
+ *
+ * Declaring `--serif`/`--sans` up on `:root` looks tidier and silently breaks
+ * the page: `var(--font-sans)` is unresolvable there, which makes the whole
+ * `font-family` declaration invalid at computed-value time, and an invalid
+ * font-family falls back to the initial value — the browser's default serif.
+ * The entire dashboard renders in Times and every fallback in the stack is
+ * skipped, because the stack itself never applies.
+ */
+.operator-root {
+  --serif: var(--font-display), ui-serif, Georgia, "Iowan Old Style", serif;
+  --sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: var(--font-mono), ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /*
+   * `tnum` everywhere, not per component. Every figure in this section is an
+   * amount, a count or a weight that sits above or below another one, so the
+   * default that helps is fixed-width digits — and turning it on globally means
+   * a new table cannot forget to.
+   *
+   * Nothing else is forced on. The character-level disambiguation that used to
+   * be bought with a sans's `zero` and `cv05` features is now structural: the
+   * strings where telling 0 from O decides whether a batch reconciles are set
+   * in Plex Mono, which draws them apart by design.
+   */
+  font-feature-settings: "tnum" 1;
+  /* All three faces ship every weight this sheet asks for, so a synthesised one
+     is always a loading failure and should look like the fallback it is. */
+  font-synthesis: none;
+
+  /* Fraunces is drawn per size by its optical-size axis; without this the
+     browser is free to ignore that and use one master for every heading. */
+  font-optical-sizing: auto;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+/* Keyboard focus is styled once, here, so tabbing through a table and its proof
+   links looks deliberate rather than falling back to the browser default. */
+a:focus-visible,
+summary:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- shell ---------- */
+
+.shell {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--space-16);
+}
+
+.topbar {
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: var(--space-10);
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 20;
+}
+
+.topbar-inner {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  min-height: 64px;
+  /* The small-screen nav panel hangs off the bottom edge of this row — see
+     `.nav-panel` in the media query at the end of this section. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: nowrap;
+}
+
+/*
+ * The wordmark: `ProofChain` in the display serif, `ledger` in the same face
+ * italic at a smaller size. The qualifier reads as a subtitle through slope and
+ * scale rather than through a weight drop, which is what an italic is for — and
+ * it is the whole of the serif budget outside the page title.
+ *
+ * Set at 600 rather than 400: at 20px, in a bar, against six nav links, the
+ * regular weight reads as body copy that happens to be a serif.
+ */
+.brand {
+  font-family: var(--serif);
+  font-variation-settings: var(--fraunces-axes);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--ink);
+  white-space: nowrap;
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3em;
+}
+
+.brand em {
+  font-style: italic;
+  font-size: var(--text-base);
+  color: var(--ink-soft);
+}
+
+/* ---------- navigation ---------- */
+
+nav.links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-link {
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  background: none;
+  cursor: pointer;
+  line-height: 1.2;
+  transition:
+    color var(--duration) var(--ease),
+    background-color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease);
+}
+
+.nav-link:hover {
+  color: var(--ink);
+  background: var(--paper-sunk);
+}
+
+/*
+ * "You are here": the institutional green on its own tint, inside a border a
+ * shade deeper. A tinted chip rather than the underline-and-bloom this used to
+ * carry — at a glance it reads as a selected item in a financial tool rather
+ * than as a link that happens to be lit.
+ */
+.nav-link[data-active="true"] {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-bg);
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.nav-more {
+  position: relative;
+  display: flex;
+}
+
+.nav-more-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.nav-more-caret {
+  font-size: 0.5rem;
+  opacity: 0.7;
+}
+
+.nav-more-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 30;
+  min-width: 13rem;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  /* The one shadow in the section, and it is here because this panel floats
+     over the page: a hairline alone cannot say "in front of". */
+  box-shadow: 0 10px 24px rgba(23, 23, 20, 0.12);
+}
+
+.nav-more-item {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  transition:
+    color var(--duration) var(--ease),
+    background-color var(--duration) var(--ease);
+}
+
+.nav-more-item:hover {
+  color: var(--ink);
+  background: var(--paper-sunk);
+}
+
+.nav-more-item[data-active="true"] {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-bg);
+}
+
+/*
+ * The mobile menu button and panel. Hidden above the breakpoint; below it the
+ * desktop row is hidden instead and this takes over — same links, same routes,
+ * one stacked panel. See `OperatorNav.tsx`.
+ */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.nav-panel {
+  display: none;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: nowrap;
+  flex: none;
+  margin-left: auto;
+}
+
+/*
+ * A requester account is a separate trust boundary from the operator nav beside
+ * it (see layout.tsx), so it is a quiet bordered pill rather than another nav
+ * entry — discoverable without reading as "another item of the same menu".
+ */
+.requester-link {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.2;
+  white-space: nowrap;
+  transition:
+    color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease);
+}
+
+.requester-link:hover {
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+
+.signin-link {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.signin-link:hover {
+  color: var(--ink);
+}
+
+/*
+ * Below 1120px the six primary links, the More menu, both account links and
+ * the theme toggle stop fitting on one 64px row — measured, not guessed: the
+ * row needs about 1110px plus gutters before anything wraps or clips.
+ *
+ * Rather than shrink the type or drop items, the whole nav collapses into one
+ * panel. The theme toggle stays out on the bar at every width because it is the
+ * one control a reader may want without navigating anywhere.
+ */
+@media (max-width: 1120px) {
+  nav.links {
+    display: none;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .topbar-actions {
+    margin-left: 0;
+  }
+
+  .topbar-actions .requester-link,
+  .topbar-actions .signin-link {
+    display: none;
+  }
+
+  /*
+   * Absolutely positioned rather than laid out in the bar: `.topbar-inner` is
+   * a single nowrap row, and a full-width panel inside it would either force
+   * the account controls onto a third line or squeeze the wordmark. Hanging it
+   * off the bottom edge keeps the bar a bar and lets the panel overlay the page
+   * the way a menu should.
+   */
+  .nav-panel {
+    display: grid;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--gutter) var(--space-4);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+    box-shadow: 0 10px 24px rgba(23, 23, 20, 0.12);
+  }
+
+  .nav-panel .nav-link,
+  .nav-panel .nav-more-item {
+    display: block;
+    padding: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  /* A labelled divider, so the overflow group keeps the meaning it has in the
+     desktop "More" menu instead of becoming a flat list of eleven links. */
+  .nav-panel-group {
+    margin: var(--space-2) 0 var(--space-1);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--rule);
+    font-size: var(--text-3xs);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+}
+
+/* ---------- page header ---------- */
+
+/*
+ * The page header pattern, and the one place the serif is allowed on a page.
+ *
+ *   eyebrow   where in the product you are     Plex Sans 12 / 600 / caps
+ *   title     what this page is                Fraunces, fluid 38→54
+ *   summary   what you can do here             Plex Sans 15
+ *
+ * The eyebrow is the section's one deliberate use of capitals. It is two or
+ * three words that name a queue, it never wraps, and it is the label a reader
+ * uses to confirm they are in the right place before reading anything else —
+ * tracked capitals are legitimate at that job and at that length.
+ *
+ * The 2px black slab that used to sit under every title is gone: at full ink it
+ * read as a redaction bar rather than a rule, and it was the loudest thing on a
+ * page whose whole argument is restraint.
+ */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--rule);
+}
+
+.page-head-text {
+  min-width: 0;
+}
+
+.page-eyebrow {
+  font-family: var(--sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 var(--space-3);
+}
+
+.page-title {
+  font-family: var(--serif);
+  font-variation-settings: var(--fraunces-axes);
+  font-size: var(--text-display);
+  /* 600, not 400. Fraunces' regular is a reading weight; a page title at 54px
+     needs the extra stem to hold the top of the page against a metric row. */
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin: 0;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.page-summary {
+  max-width: 62ch;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: var(--space-3) 0 0;
+  text-wrap: pretty;
+}
+
+/* Longer explanatory copy under the header — the note about how a debit is
+   timed, not a subtitle. Sits below the rule, at reading width. */
+.page-intro {
+  max-width: 66ch;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 0 0 var(--space-8);
+  text-wrap: pretty;
+}
+
+/* ---------- headings ---------- */
+
+/*
+ * Section headings are Plex Sans, not the serif. A serif at 20px inside a data
+ * table's neighbourhood reads as a magazine standfirst dropped into a ledger;
+ * the hierarchy here comes from weight and space, and the serif stays rare
+ * enough that the page title keeps all of its force.
+ */
+h1 {
+  font-family: var(--serif);
+  font-variation-settings: var(--fraunces-axes);
+  font-size: var(--text-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin: 0;
+}
+
+h2 {
+  font-family: var(--sans);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin: var(--space-10) 0 var(--space-4);
+}
+
+h3 {
+  font-family: var(--sans);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.4;
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+/*
+ * A label above a value, inside a card or a banner. Sentence case, because
+ * unlike the page eyebrow these appear in runs of four or six and tracked
+ * capitals at 11px in a stack are the slowest thing on a page to read.
+ */
+.eyebrow {
+  font-family: var(--sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--ink-faint);
+  margin: 0 0 var(--space-1);
+}
+
+/* ---------- toolbar ---------- */
+
+/*
+ * The row above a table: a heading on the left, filters on the right. Wraps to
+ * two rows on a phone rather than compressing the controls.
+ */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin: var(--space-10) 0 var(--space-4);
+}
+
+.toolbar h2 {
+  margin: 0;
+}
+
+/*
+ * A segmented filter. Each segment is a real link carrying the server-side
+ * `?status=` query, so the filter survives a reload, is shareable, and works
+ * with JavaScript off — the filtering is done by the API, not in the browser.
+ */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--paper-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+}
+
+.segmented a {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  line-height: 1.2;
+  white-space: nowrap;
+  transition:
+    color var(--duration) var(--ease),
+    background-color var(--duration) var(--ease);
+}
+
+.segmented a:hover {
+  color: var(--ink);
+}
+
+.segmented a[aria-current="true"] {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-weight: 600;
+  padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px);
+}
+
+/* ---------- metrics ---------- */
+
+/*
+ * Metric cards. Separate bordered blocks rather than the single divided strip
+ * this used to be: a strip made four unrelated figures look like one table row,
+ * and the first number a reader wants is the one that should be its own object.
+ *
+ * Four up on desktop, two on tablet, one on a phone — `auto-fit` with a 13rem
+ * floor does all three without a breakpoint, and the explicit two-column rule
+ * below only stops a lone third card stretching to full width on a tablet.
+ */
+/*
+ * The 9.5rem floor is what puts two cards side by side on a 390px phone rather
+ * than four stacked full-width blocks the reader has to scroll past to reach
+ * the table. `auto-fit` collapses the empty tracks, so four cards still spread
+ * evenly across a desktop row.
+ */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--space-4);
+  margin: 0 0 var(--space-8);
+}
+
+.metric {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  min-width: 0;
+}
+
+.metric-label {
+  font-family: var(--sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 var(--space-3);
+}
+
+.metric-value {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--text-metric);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+/* A second figure under the headline one — the naira value beside a credit
+   count, the share of a total. Never competes with the number above it. */
+.metric-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-2xs);
+  color: var(--ink-soft);
+}
+
+/* The tone is carried by the figure alone. Cards do not take tinted grounds:
+   four tinted cards in a row is a traffic light, not a summary. */
+.metric[data-tone="pending"] .metric-value {
+  color: var(--pending);
+}
+.metric[data-tone="verified"] .metric-value {
+  color: var(--verified);
+}
+.metric[data-tone="broken"] .metric-value {
+  color: var(--broken);
+}
+
+/* ---------- tables ---------- */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  min-width: 42rem;
+}
+
+/*
+ * Table heads: 11px, 600, capitals, tracked. The one other place capitals are
+ * used, and for the reason they exist in financial print — a column head is a
+ * fixed, one- or two-word key that a reader scans past rather than reads, and
+ * the flattened silhouette is what separates it from the data underneath.
+ */
+th {
+  text-align: left;
+  font-family: var(--sans);
+  font-size: var(--text-3xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: var(--paper-sunk);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+td {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+  line-height: 1.45;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr {
+  transition: background-color var(--duration) var(--ease);
+}
+
+tbody tr:hover {
+  background: var(--paper-sunk);
+}
+
+/*
+ * Quantities: money, credits, weights, counts. Right-aligned so the digits line
+ * up on the decimal, and `tabular-nums` is already on from `body` — that, not a
+ * change of typeface, is what holds the column.
+ */
+.num {
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/*
+ * An amount and its second reading, stacked and right-aligned as one unit. The
+ * `<strong>` is the figure; the muted line under it says the same amount in the
+ * other unit, and is never a different fact.
+ */
+.amount {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.amount strong {
+  font-weight: 600;
+}
+
+/* Machine strings — a Merkle root, a transaction hash, a public key. The only
+   use of `--mono` in this section. */
+.hash {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  word-break: break-all;
+}
+
+/* Dates, references, ids and other short metadata. The sans, quieter than the
+   surrounding row, and NOT mono: a timestamp is read, not collated. */
+.meta {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* ---------- status badges ---------- */
+
+/*
+ * Status is never carried by colour alone — the word is always present, and the
+ * tint only ranks it. Grounds are the palette's own state tints, so a badge
+ * never glows against the paper.
+ */
+.pill {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: var(--text-3xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.pill[data-tone="verified"] {
+  background: var(--verified-bg);
+  color: var(--verified);
+}
+.pill[data-tone="pending"] {
+  background: var(--pending-bg);
+  color: var(--pending);
+}
+.pill[data-tone="broken"] {
+  background: var(--broken-bg);
+  color: var(--broken);
+}
+.pill[data-tone="neutral"] {
+  background: var(--paper-sunk);
+  color: var(--ink-soft);
+}
+
+/* ---------- stat row (batch/report pages) ---------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  min-width: 0;
+}
+
+.stat dt {
+  font-family: var(--sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 var(--space-3);
+}
+
+.stat dd {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--text-metric);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.stat dd small {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+}
+
+/* ---------- proof banner ---------- */
+
+.proof {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--ink-faint);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-6);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.proof[data-state="verified"] {
+  border-left-color: var(--verified);
+  background: var(--verified-bg);
+}
+.proof[data-state="pending"] {
+  border-left-color: var(--pending);
+  background: var(--pending-bg);
+}
+.proof[data-state="broken"] {
+  border-left-color: var(--broken);
+  background: var(--broken-bg);
+}
+
+.proof h3 {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.proof dl {
+  margin: var(--space-1) 0 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-6);
+  font-size: var(--text-xs);
+}
+
+.proof dt {
+  font-family: var(--sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding-top: 0.15rem;
+}
+
+.proof dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+
+/* ---------- QR code (requester redemption) ---------- */
+
+.qr-code {
+  display: block;
+  margin: 0 auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: var(--space-2);
+}
+
+/* ---------- lookup code (printable weigh-in proof) ---------- */
+
+.lookup-code-box {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-6);
+  text-align: center;
+}
+
+/* A code read off a printed slip and typed back in — mono, tracked, so 0 and O
+   cannot be confused at the moment it matters. */
+.lookup-code {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: clamp(2rem, 1.4rem + 3vw, 3rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease),
+    color var(--duration) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--paper-sunk);
+  border-color: var(--rule-strong);
+}
+
+/*
+ * The primary action: flat institutional green.
+ *
+ * This replaces a three-stop gloss ramp with an inset lit edge and a specular
+ * sweep on hover. That button was a convincing physical object and entirely
+ * wrong for the room — in a tool whose subject is money moving, the control
+ * that moves it should read as deliberate, not as inviting.
+ */
+.btn[data-variant="primary"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn[data-variant="primary"]:hover:not(:disabled) {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
+
+/* A destructive confirmation reads in the broken tone, so "Confirm reject" is
+   never one careless click away from looking like "Confirm paid". */
+.btn[data-variant="danger"] {
+  color: var(--broken);
+  border-color: color-mix(in srgb, var(--broken) 35%, transparent);
+}
+
+.btn[data-variant="danger"]:hover:not(:disabled) {
+  background: var(--broken-bg);
+  border-color: var(--broken);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn[data-size="sm"] {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-3xs);
+}
+
+/* ---------- confirmation popovers ---------- */
+
+.confirm {
+  position: relative;
+}
+
+.confirm > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.confirm > summary::-webkit-details-marker {
+  display: none;
+}
+
+.confirm-body {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  width: min(22rem, calc(100vw - 2 * var(--gutter)));
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 24px rgba(23, 23, 20, 0.12);
+  display: grid;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.confirm-body p {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---------- forms ---------- */
+
+input,
+select,
+textarea {
+  min-height: 42px;
+  width: 100%;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration) var(--ease);
+}
+
+input:hover,
+select:hover {
+  border-color: var(--rule-strong);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 0;
+}
+
+label {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+/* ---------- alerts ---------- */
+
+/*
+ * One alert component, three tones. Structure carries the meaning: a heading
+ * that says what happened, a line that says what to do about it, and an
+ * optional action that does it. The raw string that used to sit here — one line
+ * of red text reading "Could not reach the backend." — told an operator nothing
+ * they could act on.
+ */
+.alert {
+  border: 1px solid transparent;
+  border-left: 3px solid var(--ink-faint);
+  border-radius: var(--radius-md);
+  background: var(--paper-sunk);
+  padding: var(--space-4) var(--space-6);
+  margin: 0 0 var(--space-6);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  max-width: 72ch;
+}
+
+.alert-title {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.alert-body {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+/*
+ * The underlying failure, verbatim, in mono. Kept because an operator reading
+ * "connection refused" knows to check the API process, and a support ticket
+ * that quotes it can be answered — the professional presentation is the wrapper
+ * around the real error, never a replacement for it.
+ */
+.alert-detail {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--text-3xs);
+  color: var(--ink-faint);
+  word-break: break-word;
+}
+
+.alert[data-tone="broken"] {
+  border-left-color: var(--broken);
+  background: var(--broken-bg);
+}
+.alert[data-tone="broken"] .alert-title {
+  color: var(--broken);
+}
+
+.alert[data-tone="pending"] {
+  border-left-color: var(--pending);
+  background: var(--pending-bg);
+}
+.alert[data-tone="pending"] .alert-title {
+  color: var(--pending);
+}
+
+.alert[data-tone="verified"] {
+  border-left-color: var(--verified);
+  background: var(--verified-bg);
+}
+.alert[data-tone="verified"] .alert-title {
+  color: var(--verified);
+}
+
+/*
+ * The one entrance animation in the section, and it earns its place: an alert
+ * that appears after an action needs to be noticed, and something that fades in
+ * over 160ms is noticed where something already painted is not.
+ */
+@keyframes alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.alert {
+  animation: alert-in var(--duration) var(--ease) both;
+}
+
+/* Kept for the inline `?error=` messages that have no title to carry. */
+.error {
+  border-left: 3px solid var(--broken);
+  border-radius: var(--radius-md);
+  background: var(--broken-bg);
+  color: var(--broken);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-xs);
+  margin: 0 0 var(--space-6);
+  max-width: 72ch;
+}
+
+.note {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  max-width: 66ch;
+  margin: 0 0 var(--space-6);
+}
+
+/* ---------- empty state ---------- */
+
+/*
+ * An empty screen is an invitation to act, so it says what is missing, why the
+ * screen might be empty, and offers the one control that could change it.
+ */
+.empty {
+  padding: var(--space-16) var(--space-6);
+  text-align: center;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+}
+
+.empty-title {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.empty-body {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+  max-width: 46ch;
+  line-height: 1.55;
+}
+
+.empty .btn {
+  margin-top: var(--space-2);
+}
+
+/* ---------- responsive ---------- */
+
+/*
+ * Tables on a phone.
+ *
+ * A seven-column ledger cannot be compressed to 375px and still be read, and a
+ * horizontally scrolling table hides the columns that matter (status, amount)
+ * off the right edge. So a table marked `.table--stack` becomes one card per
+ * row below 640px: each cell keeps its column name as a label, and the row's
+ * own hierarchy — amount first, then status, then metadata — survives.
+ *
+ * The labels come from `data-label` on each `td`, which is the only markup cost
+ * and is a no-op at every larger width.
+ */
+@media (max-width: 640px) {
+  .table--stack {
+    min-width: 0;
+  }
+
+  .table--stack thead {
+    /* Not `display: none`: the head still names the columns for a screen
+       reader, it is only removed from the visual flow. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table--stack,
+  .table--stack tbody,
+  .table--stack tr,
+  .table--stack td {
+    display: block;
+    width: 100%;
+  }
+
+  .table--stack tr {
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .table--stack tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table--stack td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-1) 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  .table--stack td::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: var(--text-3xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* A cell with no label is the row's own actions — it gets the full width. */
+  .table--stack td[data-label=""]::before {
+    display: none;
+  }
+
+  /* A settled row has no actions, and a bare em dash at the foot of the card
+     is not worth a line of its own on a phone. */
+  .table--stack td.is-empty {
+    display: none;
+  }
+
+  .table--stack td.num {
+    text-align: right;
+  }
+
+  /* The popover has no room to float on a phone, so it becomes part of the
+     row instead of hanging over it. */
+  .table--stack .confirm-body {
+    position: static;
+    width: 100%;
+  }
+
+  .table-wrap {
+    overflow-x: visible;
+  }
+}
+
+/* ---------- print: the audit artifact leaves as a PDF ---------- */
+
+@media print {
+  /*
+   * Selector list, not a bare `:root`, and deliberately so.
+   *
+   * Both dark rules outrank a plain `:root`: the explicit
+   * `:root[data-theme="dark"]` and the system-preference
+   * `:root:not([data-theme="light"])` are each (0,2,0) against (0,1,0). Without
+   * matching them here the audit report prints dark — the one document that
+   * leaves this system on paper and goes to a buyer — either because the reader
+   * chose dark or merely because their OS is set to it.
+   *
+   * These match that specificity exactly and win on source order, so this block
+   * MUST remain the last palette declaration in the file.
+   */
+  :root,
+  :root:not([data-theme="light"]),
+  :root[data-theme="dark"],
+  :root[data-theme="light"] {
+    color-scheme: light;
+
+    --paper: #fff;
+    --paper-sunk: #fff;
+    --surface: #fff;
+    --ink: #000;
+    --ink-soft: #333;
+    --ink-faint: #555;
+    --rule: #bbb;
+    --rule-strong: #000;
+  }
+
+  .topbar,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    font-size: 10.5pt;
+  }
+
+  .shell {
+    max-width: none;
+    padding: 0;
+  }
+
+  table {
+    min-width: 0;
+    font-size: 8.5pt;
+  }
+
+  th {
+    background: none;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  .proof,
+  .metric,
+  .stat {
+    break-inside: avoid;
+  }
+
+  .metric,
+  .stat,
+  .table-wrap,
+  .alert,
+  .empty {
+    box-shadow: none;
+  }
+
+  a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  /* A printed report must carry its own provenance. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 7.5pt;
+    color: var(--ink-faint);
+    word-break: break-all;
+  }
+}
+
+/* ---------- theme toggle ---------- */
+
+/*
+ * Square, icon-only, and built on .btn so it inherits the border, focus ring
+ * and hover treatment every other control already has.
+ */
+.theme-toggle {
+  padding: 0;
+  width: 40px;
+  flex: 0 0 auto;
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/*
+ * Which icon shows is pure CSS, keyed off the same three-state logic as the
+ * palette. That matters for more than tidiness: a React-rendered icon would
+ * have to guess the theme during SSR, so it would either mismatch on hydration
+ * or flash the wrong glyph on first paint. CSS knows the answer before React
+ * runs, so it is right on the very first frame and never re-renders.
+ *
+ * The icon shows the destination, not the current state: a moon means "go
+ * dark". Pairing it with an explicit label keeps that unambiguous.
+ */
+.theme-toggle .icon-sun {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .icon-sun {
+    display: block;
+  }
+
+  :root:not([data-theme="light"]) .theme-toggle .icon-moon {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-sun {
+  display: block;
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-moon {
+  display: none;
+}
+
+/* ---------- motion ---------- */
+
+/*
+ * Motion for a ledger.
+ *
+ * The rule this section holds itself to: an auditor is here to read numbers and
+ * decide whether to believe them, so motion only ever answers something the
+ * reader did. A hover, a press, a disclosure, an alert arriving after an
+ * action — those show what changed. Nothing loops, nothing announces itself,
+ * and no page stages its own entrance: the staggered rise every section used to
+ * perform on load was the page applauding itself, and it delayed the table an
+ * operator opened the page to read.
+ *
+ * Every duration in this file is `--duration` (160ms) and every curve is
+ * `--ease`. Both are declared once, at the top.
+ */
+
+/* A disclosure opening: the two-step confirmations, and the nav panel. */
+@keyframes disclose {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.confirm[open] > .confirm-body,
+.nav-more-panel,
+.nav-panel {
+  animation: disclose var(--duration) var(--ease) both;
+}
+
+/*
+ * The opt-out, and it is a real opt-out.
+ *
+ * None of the motion here carries information — the alert's tone, the row's
+ * tint and the button's colour all still say everything they said — so the
+ * animations are removed outright rather than shortened, and every element is
+ * pinned to its resting state.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .alert,
+  .confirm[open] > .confirm-body,
+  .nav-more-panel,
+  .nav-panel {
+    animation: none;
+  }
+
+  .btn,
+  tbody tr,
+  .nav-link,
+  .nav-more-item,
+  .requester-link,
+  .segmented a,
+  input,
+  select,
+  textarea {
+    transition: none;
+  }
+}
+
+/*
+ * Print gets the same treatment for a different reason: the batch report is the
+ * one document that leaves this system on paper, and a page captured mid-fade
+ * would print a section faded or missing.
+ */
+@media print {
+  .alert,
+  .confirm[open] > .confirm-body,
+  .nav-more-panel,
+  .nav-panel {
+    animation: none;
+  }
+
+  .btn,
+  tbody tr {
+    transition: none;
+  }
+}

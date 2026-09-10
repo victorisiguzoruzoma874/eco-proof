@@ -1,0 +1,78 @@
+/*
+ * Emoji motion, shared by both sections.
+ *
+ * Lives in its own file imported by `Emoji.tsx` rather than being duplicated
+ * into `(operator)/globals.css` and `requester/requester.css` — the two
+ * sections have deliberately unrelated visual systems, but an emoji should
+ * behave identically wherever it appears, and two copies of a keyframe is
+ * two copies to drift.
+ *
+ * Idle motion is deliberately tiny (a 1.5px drift over 3s). Emoji appear in
+ * dense tables here — a dozen bobbing icons in a ledger would be a
+ * distraction from the numbers, which are the point of those screens.
+ */
+
+.emoji {
+  display: inline-block;
+  /* Own stacking/transform context so the animation can never nudge
+     surrounding text metrics or reflow a table cell. */
+  will-change: transform;
+  animation: emoji-drift 3.2s ease-in-out infinite;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.22s ease;
+}
+
+/* Staggered so a column of them never pulses in lockstep — that reads as a
+   glitch, whereas offset motion reads as incidental life. */
+.emoji:nth-of-type(3n) {
+  animation-delay: -0.9s;
+}
+.emoji:nth-of-type(3n + 1) {
+  animation-delay: -1.8s;
+}
+
+@keyframes emoji-drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-1.5px) rotate(-2deg);
+  }
+}
+
+/* The reward for pointing at one: a quick, springy wiggle. */
+.emoji:hover {
+  animation-play-state: paused;
+  transform: scale(1.35) rotate(8deg);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.18));
+}
+
+/* Row/card hover lifts every emoji inside it, so the whole line feels alive
+   rather than only the 24px the cursor happens to be over. */
+tr:hover .emoji,
+.rq-card:hover .emoji,
+.card:hover .emoji {
+  animation-play-state: paused;
+  transform: translateY(-2px) scale(1.14) rotate(-5deg);
+}
+
+/*
+ * Motion is opt-out at the OS level, and this is the whole of that opt-out
+ * for emoji: vestibular disorders make persistent idle motion genuinely
+ * unpleasant, and none of the above carries information — it is decoration,
+ * so it is safe to remove entirely rather than merely shorten.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .emoji,
+  .emoji:hover,
+  tr:hover .emoji,
+  .rq-card:hover .emoji,
+  .card:hover .emoji {
+    animation: none;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+}
