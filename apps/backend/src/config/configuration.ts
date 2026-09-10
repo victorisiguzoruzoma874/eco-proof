@@ -2,6 +2,7 @@ import {
   resolvePostgresConnection,
   type PostgresConnection,
 } from "../database/postgres-connection";
+import { isInMemoryMode } from "../database/in-memory-flag";
 import { parseTrustProxy, type TrustProxySetting } from "./trust-proxy";
 
 export interface AppConfig {
@@ -35,34 +36,6 @@ export interface AppConfig {
    */
   maxPhotoBytes: number;
   maxClockSkewSeconds: number;
-  stellarNetwork: "testnet" | "public";
-  /**
-   * Horizon endpoint the backend reads anchors back from.
-   *
-   * The anchor worker verifies a root against the ledger at write time, but
-   * nothing re-checks it afterwards, so `GET /batches/:id/verify/:eventId`
-   * has been proving a Merkle path against a root held in our own database —
-   * exactly the thing a buyer is not supposed to have to trust. Reading it
-   * back here is what makes the endpoint's claim falsifiable.
-   */
-  stellarHorizonUrl: string;
-  /**
-   * Ceiling on a Horizon read. Verification is a public, unauthenticated
-   * endpoint; an unbounded upstream call there is a way to tie up a request
-   * worker for as long as Horizon is slow.
-   */
-  horizonTimeoutMs: number;
-  /**
-   * Shared secret the anchor worker presents when writing back a Stellar
-   * transaction to a sealed batch. `POST /batches/:id/anchor` cannot require a
-   * human JWT (the worker is a machine with no operator session), but it must
-   * not be reachable by an anonymous caller either: an unauthenticated writer
-   * could plant a fabricated Stellar tx hash on a sealed batch, and that lie
-   * would flow straight into the audit report sold to buyers. This token is
-   * the credential that makes the endpoint "public to the worker", not
-   * "public to the internet".
-   */
-  anchorWorkerToken: string;
 }
 
 function required(name: string): string {
@@ -87,16 +60,18 @@ export function loadConfig(): AppConfig {
     throw new Error("JWT_SECRET is still the placeholder value; set a real secret");
   }
 
-  // Same "fail fast, no shipped default" reasoning as JWT_SECRET: a default
-  // anchor-worker token in production would let anyone forge anchor records.
-  const anchorWorkerToken = isProduction
-    ? required("ANCHOR_WORKER_TOKEN")
-    : (process.env.ANCHOR_WORKER_TOKEN ?? "dev-anchor-worker-token");
+  // `--in-memory` never opens a real Postgres connection (app.module.ts's
+  // dataSourceFactory routes to pg-mem instead), so DATABASE_URL should not be
+  // a required env var on that boot path — a placeholder that satisfies the
+  // type is fine precisely because nothing reads it.
+  const database: PostgresConnection = isInMemoryMode()
+    ? { url: "postgres://unused:unused@in-memory/unused", ssl: false }
+    : resolvePostgresConnection();
 
   return {
     nodeEnv,
     port: Number(process.env.PORT ?? 3000),
-    database: resolvePostgresConnection(),
+    database,
     jwtSecret,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "12h",
     corsOrigins: (process.env.CORS_ORIGINS ?? "http://localhost:3001")
@@ -107,9 +82,5 @@ export function loadConfig(): AppConfig {
     photoStorageDir: process.env.PHOTO_STORAGE_DIR ?? "./var/photos",
     maxPhotoBytes: Number(process.env.MAX_PHOTO_BYTES ?? 8 * 1024 * 1024),
     maxClockSkewSeconds: Number(process.env.MAX_CLOCK_SKEW_SECONDS ?? 900),
-    stellarNetwork: (process.env.STELLAR_NETWORK ?? "testnet") as AppConfig["stellarNetwork"],
-    stellarHorizonUrl: process.env.STELLAR_HORIZON_URL ?? "https://horizon-testnet.stellar.org",
-    horizonTimeoutMs: Number(process.env.HORIZON_TIMEOUT_MS ?? 8_000),
-    anchorWorkerToken,
   };
 }

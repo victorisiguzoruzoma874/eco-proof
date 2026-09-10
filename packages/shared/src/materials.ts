@@ -2,12 +2,12 @@
  * The material catalogue.
  *
  * A material code is part of the signed weigh-in payload, so it is hashed into
- * the Merkle leaf and anchored on the ledger. That has a consequence which
- * shapes everything in this file: **a code that has been signed can never be
- * renamed or deleted.** An audit report replays the exact string the device
- * signed, and a buyer recomputing the root from the event list must get the same
- * digest years later. Rewriting "PS" to "POLYSTYRENE" in the database would not
- * migrate history — it would silently invalidate every batch that contained it.
+ * the Merkle leaf. That has a consequence which shapes everything in this
+ * file: **a code that has been signed can never be renamed or deleted.** An
+ * audit report replays the exact string the device signed, and a buyer
+ * recomputing the root from the event list must get the same digest years
+ * later. Rewriting "PS" to "POLYSTYRENE" in the database would not migrate
+ * history — it would silently invalidate every batch that contained it.
  *
  * So the catalogue separates three things that are easy to conflate:
  *
@@ -26,10 +26,10 @@
 /**
  * Shape of a code. Deliberately narrow: uppercase alphanumerics with internal
  * separators, 2–16 characters. Codes travel through a canonical JSON
- * serialisation and end up in a Stellar data-entry key, so they must be stable
- * under transport and free of anything needing escaping. The narrowness is also
- * a guard against an operator typing a display name into the code field and
- * permanently minting `Clear bottle plastic` as a signed identifier.
+ * serialisation and must be stable under transport and free of anything
+ * needing escaping. The narrowness is also a guard against an operator typing
+ * a display name into the code field and permanently minting `Clear bottle
+ * plastic` as a signed identifier.
  */
 export const MATERIAL_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,15}$/;
 

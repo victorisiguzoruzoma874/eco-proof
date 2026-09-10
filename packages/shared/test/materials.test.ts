@@ -55,7 +55,7 @@ describe("isMaterialCode", () => {
     ["a single character", "P"],
     ["empty", ""],
     ["a leading separator", "-PET"],
-    ["a dot, which a Stellar data key should not carry", "PET.1"],
+    ["a dot", "PET.1"],
     ["a slash", "PET/HDPE"],
     ["a quote", "PET'"],
     ["seventeen characters", "A".repeat(17)],

@@ -173,6 +173,41 @@ export class EventsService {
     return event;
   }
 
+  /**
+   * Find the event whose `payloadHash` starts with the given lookup code —
+   * the same slice (`payloadHash.slice(0, 10)`) the printable proof page
+   * hands the collector, and the id the reweigh screen is meant to accept.
+   * `payloadHash` is a unique sha256 hex digest, so a real 10-char prefix
+   * collision is astronomically unlikely, but this stays defensive about it
+   * rather than silently guessing: a shorter code that turns out to match
+   * more than one event is reported as ambiguous, not resolved by picking one.
+   */
+  async findByLookupCode(code: string): Promise<CollectionEventEntity> {
+    const normalised = code.trim().toLowerCase();
+    if (!/^[0-9a-f]{6,64}$/.test(normalised)) {
+      throw new BadRequestException(
+        "lookup code must be 6-64 hex characters — check it against the proof page",
+      );
+    }
+
+    const matches = await this.events
+      .createQueryBuilder("e")
+      .where("e.payloadHash LIKE :prefix", { prefix: `${normalised}%` })
+      .orderBy("e.receivedAt", "ASC")
+      .getMany();
+
+    const [first, ...rest] = matches;
+    if (!first) {
+      throw new NotFoundException(`no weigh-in matches lookup code ${normalised}`);
+    }
+    if (rest.length > 0) {
+      throw new BadRequestException(
+        `${matches.length} submissions match this code — it is not unique enough; use the full weigh-in id instead`,
+      );
+    }
+    return first;
+  }
+
   async list(filter: {
     hubId?: string;
     collectorId?: string;

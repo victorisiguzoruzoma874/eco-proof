@@ -14,7 +14,6 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import * as argon2 from "argon2";
-import { timingSafeEqual } from "node:crypto";
 import type { Request } from "express";
 import { UserEntity } from "../database/entities";
 import { loadConfig } from "../config/configuration";
@@ -156,42 +155,6 @@ export class JwtAuthGuard implements CanActivate {
   }
 }
 
-/**
- * Guards `POST /batches/:id/anchor`, the anchor worker's write-back of a
- * Stellar transaction onto a sealed batch. That route is `@Public()` (opted
- * out of `JwtAuthGuard`) because the worker is a headless service with no
- * operator session — but "no operator session" must not mean "no credential
- * at all". Before this guard existed, anyone who could learn a batch's
- * merkleRoot (trivially — it is printed by the public audit report) could
- * POST a fabricated Stellar tx hash and have it accepted as the on-chain
- * proof in every report sold to a buyer thereafter. Compares with
- * `timingSafeEqual` so the check itself cannot be timing-attacked into
- * leaking the token.
- */
-@Injectable()
-export class AnchorWorkerGuard implements CanActivate {
-  private readonly token = loadConfig().anchorWorkerToken;
-
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
-    const presented = request.headers["x-anchor-worker-token"];
-
-    if (typeof presented !== "string" || !this.matchesToken(presented)) {
-      throw new UnauthorizedException("missing or invalid anchor worker token");
-    }
-    return true;
-  }
-
-  private matchesToken(presented: string): boolean {
-    const expected = Buffer.from(this.token, "utf8");
-    const given = Buffer.from(presented, "utf8");
-    // Lengths must match before timingSafeEqual will even accept the buffers;
-    // padding the comparison keeps that early return from leaking length info.
-    if (given.length !== expected.length) return false;
-    return timingSafeEqual(given, expected);
-  }
-}
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity]),
@@ -205,11 +168,11 @@ export class AnchorWorkerGuard implements CanActivate {
       },
     }),
   ],
-  providers: [AuthService, JwtAuthGuard, AnchorWorkerGuard],
+  providers: [AuthService, JwtAuthGuard],
   // TypeOrmModule is re-exported so the UserEntity repository is resolvable
   // wherever JwtAuthGuard is instantiated. AppModule registers it as a global
   // APP_GUARD, which builds its own instance in AppModule's injector — without
   // this the app fails to boot on an unresolvable repository dependency.
-  exports: [AuthService, JwtAuthGuard, AnchorWorkerGuard, JwtModule, TypeOrmModule],
+  exports: [AuthService, JwtAuthGuard, JwtModule, TypeOrmModule],
 })
 export class AuthModule {}

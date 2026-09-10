@@ -32,6 +32,26 @@ export class EventsController {
     return this.events.list(query);
   }
 
+  /**
+   * Public, same reasoning as `findOne` below: hub staff on the reweigh
+   * screen have only the short code printed on the collector's proof page,
+   * not its database id. Declared ahead of `:id` in this file for readability,
+   * though route matching does not actually depend on the order — `:id`
+   * matches exactly one path segment, and `by-code/:code` is two, so they
+   * never compete for the same request.
+   */
+  @Public()
+  @Get("by-code/:code")
+  findByLookupCode(@Param("code") code: string) {
+    return this.events.findByLookupCode(code);
+  }
+
+  /**
+   * Public: a collector who submitted a weigh-in from their own device has no
+   * dashboard account, but still needs to look up and print their proof
+   * (Phase 5's printable lookup-code page) without one.
+   */
+  @Public()
   @Get(":id")
   findOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.events.findOne(id);

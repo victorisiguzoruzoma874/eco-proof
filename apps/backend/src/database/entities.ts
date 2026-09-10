@@ -12,14 +12,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from "typeorm";
-import type {
-  AnchorAttemptOutcome,
-  BatchStatus,
-  IntegrityVerdict,
-  KycLevel,
-  MaterialType,
-  StellarNetwork,
-} from "@proofchain/shared";
+import type { BatchStatus, IntegrityVerdict, KycLevel, MaterialType } from "@proofchain/shared";
 
 /**
  * The five core entities (plus Hub and Device, which the integrity checks need).
@@ -163,9 +156,6 @@ export class BatchEntity {
   @OneToMany(() => CollectionEventEntity, (e) => e.batch)
   events: CollectionEventEntity[];
 
-  @OneToOne(() => AnchorRecordEntity, (a) => a.batch)
-  anchor: AnchorRecordEntity | null;
-
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
@@ -301,98 +291,6 @@ export class CustodyTransferEntity {
   createdAt: Date;
 }
 
-/** Links off-chain data to its on-chain proof. One anchor per batch. */
-@Entity("anchor_records")
-export class AnchorRecordEntity {
-  @PrimaryGeneratedColumn("uuid")
-  id: string;
-
-  @Index({ unique: true })
-  @Column("uuid")
-  batchId: string;
-
-  @OneToOne(() => BatchEntity, (b) => b.anchor, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "batchId" })
-  batch: BatchEntity;
-
-  @Column()
-  merkleRoot: string;
-
-  @Column({ unique: true })
-  stellarTxHash: string;
-
-  @Column("bigint", { transformer: numericTransformer })
-  stellarLedger: number;
-
-  @Column({ type: "varchar", default: "testnet" })
-  network: StellarNetwork;
-
-  /** The manageData key the root was written under. */
-  @Column()
-  dataEntryKey: string;
-
-  @Column("timestamptz")
-  anchoredAt: Date;
-
-  @CreateDateColumn({ type: "timestamptz" })
-  createdAt: Date;
-}
-
-/**
- * One recorded attempt to put a batch's root on the ledger.
- *
- * Append-only, and it exists because failure was previously invisible. The
- * worker logged `[anchor-failed]` to stdout and moved on, leaving a batch that
- * had failed four hundred times indistinguishable from one sealed a minute ago:
- * both simply sat in the pending queue. Nobody could answer "is anchoring
- * working" without reading worker logs, and nothing throttled the retries.
- *
- * Successes are recorded too, so the table reads as the full history of what
- * was tried rather than a list of complaints.
- */
-@Entity("anchor_attempts")
-@Index("ix_anchor_attempt_batch_time", ["batchId", "occurredAt"])
-export class AnchorAttemptEntity {
-  @PrimaryGeneratedColumn("uuid")
-  id: string;
-
-  @Index()
-  @Column("uuid")
-  batchId: string;
-
-  @ManyToOne(() => BatchEntity, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "batchId" })
-  batch: BatchEntity;
-
-  /** 1-based, assigned by the backend so two workers cannot both claim "attempt 3". */
-  @Column("int")
-  attemptNumber: number;
-
-  /**
-   * `failed` — the transaction never made it onto the ledger.
-   * `unverified` — it was submitted but the read-back could not confirm it,
-   *   which is the more alarming of the two: it may have cost a real fee and
-   *   may yet appear.
-   * `succeeded` — the anchor was recorded.
-   */
-  @Column({ type: "varchar" })
-  outcome: AnchorAttemptOutcome;
-
-  /** The error text, truncated. Operators debug from this, so it is stored verbatim. */
-  @Column({ type: "text", nullable: true })
-  detail: string | null;
-
-  /** A transaction hash exists for `unverified` attempts and is what an operator chases. */
-  @Column({ type: "varchar", nullable: true })
-  stellarTxHash: string | null;
-
-  @Column("timestamptz")
-  occurredAt: Date;
-
-  @CreateDateColumn({ type: "timestamptz" })
-  createdAt: Date;
-}
-
 /** Operator/auditor login. Collectors authenticate by device key, not password. */
 @Entity("users")
 export class UserEntity {
@@ -411,6 +309,84 @@ export class UserEntity {
 
   @Column({ default: true })
   active: boolean;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * Hub re-weigh against a collector's claimed weight — the check that turns a
+ * self-reported drop-off into something payable. One per event: a second
+ * re-weigh of the same event would be a data-entry mistake, not a correction,
+ * so the FK is unique rather than merely indexed.
+ *
+ * `UserEntity` is declared above this class (rather than in file order after
+ * it, as it once was) because TypeScript's emitted `design:type` decorator
+ * metadata evaluates a `@ManyToOne(() => UserEntity, ...)` target's identifier
+ * eagerly, at class-decoration time — a forward reference here hits
+ * `UserEntity`'s temporal dead zone and throws `ReferenceError` at import time,
+ * not just at typecheck time. Keep every entity that types a relation as
+ * `UserEntity` below this declaration.
+ *
+ * This is a deliberately separate table, not columns bolted onto
+ * `CollectionEventEntity`: the event's signed/hashed columns feed the Merkle
+ * leaf and are treated as immutable once ingested, so re-weigh data — captured
+ * later, by hub staff, never signed by the device — must live somewhere else.
+ *
+ * `claimedWeightKg` is copied from the event at reweigh time rather than
+ * joined live, so this row stays a self-contained audit fact on its own.
+ * `varianceKg`/`variancePct` are stored, not derived, mirroring
+ * `CustodyTransferEntity`'s convention: a later change to either weight must
+ * not silently change the recorded variance.
+ */
+@Entity("event_reweighs")
+export class EventReweighEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index({ unique: true })
+  @Column("uuid")
+  eventId: string;
+
+  @OneToOne(() => CollectionEventEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "eventId" })
+  event: CollectionEventEntity;
+
+  @Column("numeric", { precision: 10, scale: 3, transformer: numericTransformer })
+  claimedWeightKg: number;
+
+  @Column("numeric", { precision: 10, scale: 3, transformer: numericTransformer })
+  verifiedWeightKg: number;
+
+  @Column("numeric", { precision: 10, scale: 3, transformer: numericTransformer })
+  varianceKg: number;
+
+  @Column("numeric", { precision: 6, scale: 3, transformer: numericTransformer })
+  variancePct: number;
+
+  /**
+   * `verified` / `flagged` are set by the ±5% tolerance check at reweigh time
+   * and both are payable. `rejected` is not set by that automated logic — it
+   * exists only as a manual override hub staff could apply separately (e.g.
+   * voiding a submission for cause).
+   */
+  @Column({ type: "varchar" })
+  status: "verified" | "flagged" | "rejected";
+
+  /** Required whenever status is flagged/rejected — the audit trail for why it diverged. */
+  @Column({ type: "varchar", nullable: true })
+  notes: string | null;
+
+  @Index()
+  @Column("uuid")
+  verifiedByUserId: string;
+
+  @ManyToOne(() => UserEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "verifiedByUserId" })
+  verifiedByUser: UserEntity;
+
+  @Column("timestamptz")
+  verifiedAt: Date;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
@@ -472,6 +448,561 @@ export class MaterialEntity {
   updatedAt: Date;
 }
 
+/**
+ * One payment run to a collector, covering one or more verified re-weighs.
+ *
+ * Payout destination stays manual/cash for now — there is no structured
+ * payout-account column on `CollectorEntity` in this phase. `method` is a
+ * free-text record of how this specific payout was actually handed over
+ * (cash, mobile money, bank), not a validated attribute of the collector.
+ */
+@Entity("payouts")
+export class PayoutEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column("uuid")
+  collectorId: string;
+
+  @ManyToOne(() => CollectorEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "collectorId" })
+  collector: CollectorEntity;
+
+  @Column("numeric", { precision: 12, scale: 2, transformer: numericTransformer })
+  amount: number;
+
+  @Column({ type: "varchar", default: "NGN" })
+  currency: string;
+
+  /** e.g. "cash" | "mobile_money" | "bank" — free text, not an enforced enum. */
+  @Column({ type: "varchar" })
+  method: string;
+
+  @Column({ type: "varchar", nullable: true })
+  payoutRef: string | null;
+
+  @Column({ type: "varchar", default: "pending" })
+  status: "pending" | "paid" | "failed";
+
+  @Column({ type: "uuid", nullable: true })
+  paidByUserId: string | null;
+
+  @ManyToOne(() => UserEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "paidByUserId" })
+  paidByUser: UserEntity | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  paidAt: Date | null;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * One re-weigh's contribution to a payout. A payout can cover several
+ * drop-offs, so this is a join row carrying the amount attributed to that
+ * one re-weigh, not a duplicate of `PayoutEntity.amount`.
+ */
+@Entity("payout_items")
+export class PayoutItemEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column("uuid")
+  payoutId: string;
+
+  @ManyToOne(() => PayoutEntity, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "payoutId" })
+  payout: PayoutEntity;
+
+  @Index()
+  @Column("uuid")
+  eventReweighId: string;
+
+  @ManyToOne(() => EventReweighEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "eventReweighId" })
+  eventReweigh: EventReweighEntity;
+
+  @Column("numeric", { precision: 12, scale: 2, transformer: numericTransformer })
+  amount: number;
+}
+
+/**
+ * A fixed rate per kg for a material, optionally scoped to one hub.
+ *
+ * The payout service resolves the applicable rate rather than taking a manual
+ * amount per item: most specific `hubId` match, most recent `effectiveFrom`
+ * at or before now. `hubId: null` is the global default rate for a material.
+ *
+ * No FK from `collection_events`/`batches` to this table for the same reason
+ * `MaterialEntity` has none from those tables — a rate is current
+ * configuration, and a signed weigh-in's material must never be able to
+ * dangle on a rate change.
+ */
+@Entity("material_rates")
+export class MaterialRateEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column({ type: "varchar", length: 16 })
+  materialCode: string;
+
+  @ManyToOne(() => MaterialEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "materialCode" })
+  material: MaterialEntity;
+
+  /** Null = global default rate; set = an override scoped to one hub. */
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  hubId: string | null;
+
+  @ManyToOne(() => HubEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "hubId" })
+  hub: HubEntity | null;
+
+  @Column("numeric", { precision: 10, scale: 2, transformer: numericTransformer })
+  ratePerKg: number;
+
+  @Column("timestamptz")
+  effectiveFrom: Date;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * A self-registering consumer requesting pickups — a different trust
+ * boundary from `UserEntity` (admin-provisioned operator/auditor accounts).
+ * Own JWT and own guard land in a later phase; this pass is the data model
+ * only. No forward entity references, so this can be declared anywhere —
+ * it sits here, immediately before the first entity that references it.
+ */
+@Entity("requesters")
+export class RequesterEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column()
+  name: string;
+
+  @Column({ unique: true })
+  email: string;
+
+  @Column("text")
+  passwordHash: string;
+
+  @Column({ type: "varchar", nullable: true })
+  phone: string | null;
+
+  @Column({ default: true })
+  active: boolean;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * A requester's pickup request. Fulfilled by linking it to an
+ * already-hub-reweighed `CollectionEventEntity` rather than by changing the
+ * signed capture payload schema to carry a request id — same signature, same
+ * integrity checks, same hub scale, just credited to a requester's wallet
+ * instead of (or alongside) a collector's cash payout. `eventId` is unique:
+ * a request is fulfilled by exactly one event, and one event fulfills at
+ * most one request.
+ *
+ * `RequesterEntity`, `HubEntity`, `CollectorEntity`, and
+ * `CollectionEventEntity` are all declared above this class for the same
+ * eager-decorator-metadata reason documented on `EventReweighEntity`: a
+ * `@ManyToOne`/`@OneToOne` target referenced before its own class
+ * declaration hits that class's temporal dead zone and throws
+ * `ReferenceError` at import time, not just at typecheck time. Keep every
+ * entity that types a relation as `CollectionRequestEntity` below this
+ * declaration.
+ *
+ * `material` is a plain varchar with no FK, matching
+ * `CollectionEventEntity.material` and `BatchEntity.material` — see
+ * `MaterialEntity`'s doc comment for why a material code is never referenced
+ * by foreign key. `address` is a descriptive free-text field only — no
+ * lat/lng, consistent with `RemoveLocation.ts` removing coordinates from the
+ * schema entirely.
+ */
+@Entity("collection_requests")
+export class CollectionRequestEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column("uuid")
+  requesterId: string;
+
+  @ManyToOne(() => RequesterEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "requesterId" })
+  requester: RequesterEntity;
+
+  @Index()
+  @Column("uuid")
+  hubId: string;
+
+  @ManyToOne(() => HubEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "hubId" })
+  hub: HubEntity;
+
+  @Column({ type: "varchar" })
+  material: MaterialType;
+
+  @Column("numeric", {
+    precision: 10,
+    scale: 3,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  estimatedWeightKg: number | null;
+
+  @Column({ type: "varchar", nullable: true })
+  address: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  notes: string | null;
+
+  /**
+   * `requested -> assigned (optional) -> collected (redemption code issued)
+   * -> redeemed`, plus `cancelled` from `requested`/`assigned`. "Collected"
+   * is reached only once the linked event has a `verified`/`flagged`
+   * `EventReweighEntity` — never from a bare unverified weigh-in.
+   */
+  @Column({ type: "varchar", default: "requested" })
+  status: "requested" | "assigned" | "collected" | "redeemed" | "cancelled";
+
+  @Column({ type: "uuid", nullable: true })
+  assignedCollectorId: string | null;
+
+  @ManyToOne(() => CollectorEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "assignedCollectorId" })
+  assignedCollector: CollectorEntity | null;
+
+  /**
+   * Set at fulfillment. Unique, not merely indexed — a request is fulfilled
+   * by exactly one event, and one event fulfills at most one request.
+   */
+  @Index({ unique: true })
+  @Column({ type: "uuid", nullable: true })
+  eventId: string | null;
+
+  @OneToOne(() => CollectionEventEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "eventId" })
+  event: CollectionEventEntity | null;
+
+  @Column({ type: "varchar", nullable: true, unique: true })
+  redemptionCode: string | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  redeemedAt: Date | null;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+
+  @UpdateDateColumn({ type: "timestamptz" })
+  updatedAt: Date;
+}
+
+/**
+ * One wallet per requester, created alongside the requester. Deliberately no
+ * balance column: balance is always computed on read from
+ * `WalletTransactionEntity` — see that entity's doc comment for why, and
+ * `reports.service.ts` / `batches.service.ts`'s Merkle root handling for the
+ * same "recompute from source rows" convention elsewhere in this codebase.
+ *
+ * `RequesterEntity` is declared above this class for the same
+ * eager-decorator-metadata reason as `CollectionRequestEntity` above.
+ */
+@Entity("waste_wallets")
+export class WasteWalletEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  /** Unique — one wallet per requester. */
+  @Index({ unique: true })
+  @Column("uuid")
+  requesterId: string;
+
+  @OneToOne(() => RequesterEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "requesterId" })
+  requester: RequesterEntity;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * One entry in a wallet's ledger. Wallet balance is ALWAYS computed as
+ * `SUM(amountCredits)` filtered by `type` over this table for a wallet,
+ * never stored on `WasteWalletEntity` — this mirrors the codebase's existing
+ * "recompute from source rows" convention (audit totals in
+ * `reports.service.ts`, the Merkle root in `batches.service.ts`). Only
+ * `type: "credit"` is produced by anything in this pass; `"debit"` is
+ * allowed by the column so a future spend/expiry path does not need a schema
+ * change.
+ *
+ * `walletId` is `ON DELETE CASCADE` — a transaction has no meaning without
+ * its wallet, and keeping orphans would block a wallet from ever being
+ * removed. `collectionRequestId`/`eventId` are `ON DELETE RESTRICT` and
+ * nullable — a transaction usually cites the request/event it was credited
+ * for, but neither is required, so this table stays usable for other credit
+ * sources later without a schema change.
+ *
+ * `WasteWalletEntity`, `CollectionRequestEntity`, and `CollectionEventEntity`
+ * are all declared above this class for the same eager-decorator-metadata
+ * reason as above.
+ */
+@Entity("wallet_transactions")
+export class WalletTransactionEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column("uuid")
+  walletId: string;
+
+  @ManyToOne(() => WasteWalletEntity, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "walletId" })
+  wallet: WasteWalletEntity;
+
+  @Column({ type: "varchar" })
+  type: "credit" | "debit";
+
+  @Column("numeric", { precision: 12, scale: 3, transformer: numericTransformer })
+  amountCredits: number;
+
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  collectionRequestId: string | null;
+
+  @ManyToOne(() => CollectionRequestEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "collectionRequestId" })
+  collectionRequest: CollectionRequestEntity | null;
+
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  eventId: string | null;
+
+  @ManyToOne(() => CollectionEventEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "eventId" })
+  event: CollectionEventEntity | null;
+
+  @Column({ type: "varchar", nullable: true })
+  description: string | null;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * A requester's cash-out request against their wallet — mirrors
+ * `PayoutEntity`'s `pending -> paid` pattern exactly, on purpose (see that
+ * entity's doc comment): a debit is only ever written to
+ * `WalletTransactionEntity` once money has actually moved (`markPaid`), never
+ * at request time, so a manual payout that falls through never leaves a
+ * wallet showing a debit for cash the requester didn't receive.
+ * `"rejected"` releases the hold with no debit ever written.
+ *
+ * `amountCredits` is the amount held, not copied from anywhere else — it is
+ * the source fact this row exists to record.
+ *
+ * `RequesterEntity` and `UserEntity` are both already declared above this
+ * class, so no forward-reference decorator-metadata issue arises here — same
+ * eager-decorator-metadata reason documented on `EventReweighEntity`.
+ */
+@Entity("withdrawal_requests")
+export class WithdrawalRequestEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column("uuid")
+  requesterId: string;
+
+  @ManyToOne(() => RequesterEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "requesterId" })
+  requester: RequesterEntity;
+
+  @Column("numeric", { precision: 12, scale: 3, transformer: numericTransformer })
+  amountCredits: number;
+
+  @Column({ type: "varchar", default: "pending" })
+  status: "pending" | "paid" | "rejected";
+
+  @Column({ type: "varchar", nullable: true })
+  payoutRef: string | null;
+
+  @Column({ type: "uuid", nullable: true })
+  paidByUserId: string | null;
+
+  @ManyToOne(() => UserEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "paidByUserId" })
+  paidByUser: UserEntity | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  paidAt: Date | null;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * A fixed rate of waste credits per kg for a material, optionally scoped to
+ * one hub — structurally identical to `MaterialRateEntity`, just a different
+ * currency for a different beneficiary (consumer credits into a requester's
+ * wallet, not collector cash payout). Same resolution rule: most specific
+ * `hubId` match, most recent `effectiveFrom` at or before now. `hubId: null`
+ * is the global default rate for a material.
+ *
+ * `materialCode` references `materials.code` with `ON DELETE RESTRICT` for
+ * the same reason as `MaterialRateEntity.materialCode` — a rate is itself
+ * current configuration, not evidence, so tying it to the catalogue row is
+ * the correct, safe coupling.
+ *
+ * `MaterialEntity` and `HubEntity` are both already declared above this
+ * class, so no forward-reference decorator-metadata issue arises here — same
+ * placement rule as `MaterialRateEntity`, which has the identical dependency
+ * shape.
+ */
+@Entity("credit_rates")
+export class CreditRateEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column({ type: "varchar", length: 16 })
+  materialCode: string;
+
+  @ManyToOne(() => MaterialEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "materialCode" })
+  material: MaterialEntity;
+
+  /** Null = global default rate; set = an override scoped to one hub. */
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  hubId: string | null;
+
+  @ManyToOne(() => HubEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "hubId" })
+  hub: HubEntity | null;
+
+  @Column("numeric", { precision: 10, scale: 2, transformer: numericTransformer })
+  creditsPerKg: number;
+
+  @Column("timestamptz")
+  effectiveFrom: Date;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * The redemption catalogue an admin maintains at runtime — a requester
+ * exchanges wallet credits for a listed item (airtime, goods, a discount)
+ * instead of, or alongside, cashing out via `WithdrawalRequestEntity`.
+ * `active: false` retires an item without touching any past redemption, the
+ * same active/retired split `MaterialEntity` uses.
+ *
+ * `stock: null` means unlimited (e.g. a discount code with no unit cap);
+ * a non-null value is decremented by `CatalogService.redeem` and never
+ * allowed to go negative.
+ *
+ * No forward references to any other new entity, so this can be declared
+ * anywhere — it sits here, immediately before the first entity that
+ * references it.
+ */
+@Entity("catalog_items")
+export class CatalogItemEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column()
+  name: string;
+
+  @Column({ type: "varchar", nullable: true })
+  description: string | null;
+
+  /** Free text, e.g. "airtime" | "goods" | "discount" — not an enforced enum. */
+  @Column({ type: "varchar" })
+  category: string;
+
+  @Column("numeric", { precision: 12, scale: 3, transformer: numericTransformer })
+  costCredits: number;
+
+  @Column({ type: "int", nullable: true })
+  stock: number | null;
+
+  @Column({ default: true })
+  active: boolean;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
+ * One requester's redemption of a catalog item. Debits the wallet
+ * immediately (unlike `WithdrawalRequestEntity`, which debits only at
+ * `"paid"`) — no real money is being promised here, only an internal ledger
+ * entry against a listed item, so there is no reason to delay it. A
+ * physical/airtime fulfillment step still exists (`"pending_fulfillment" ->
+ * "fulfilled"`) but does not gate the debit.
+ *
+ * `costCredits` is copied from the item at redemption time, not joined live
+ * — the same "stored, not derived" convention as
+ * `EventReweighEntity.claimedWeightKg` — so a later price change on the item
+ * never rewrites the cost of a redemption already made.
+ *
+ * `RequesterEntity`, `CatalogItemEntity`, and `UserEntity` are all already
+ * declared above this class, so no forward-reference decorator-metadata
+ * issue arises here — same eager-decorator-metadata reason documented on
+ * `EventReweighEntity`.
+ */
+@Entity("catalog_redemptions")
+export class CatalogRedemptionEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Index()
+  @Column("uuid")
+  requesterId: string;
+
+  @ManyToOne(() => RequesterEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "requesterId" })
+  requester: RequesterEntity;
+
+  @Index()
+  @Column("uuid")
+  itemId: string;
+
+  @ManyToOne(() => CatalogItemEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "itemId" })
+  item: CatalogItemEntity;
+
+  @Column("numeric", { precision: 12, scale: 3, transformer: numericTransformer })
+  costCredits: number;
+
+  @Column({ type: "varchar", default: "pending_fulfillment" })
+  status: "pending_fulfillment" | "fulfilled";
+
+  @Column({ type: "uuid", nullable: true })
+  fulfilledByUserId: string | null;
+
+  @ManyToOne(() => UserEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "fulfilledByUserId" })
+  fulfilledByUser: UserEntity | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  fulfilledAt: Date | null;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
 export const ALL_ENTITIES = [
   HubEntity,
   CollectorEntity,
@@ -479,8 +1010,18 @@ export const ALL_ENTITIES = [
   BatchEntity,
   CollectionEventEntity,
   CustodyTransferEntity,
-  AnchorRecordEntity,
-  AnchorAttemptEntity,
+  EventReweighEntity,
   UserEntity,
   MaterialEntity,
+  PayoutEntity,
+  PayoutItemEntity,
+  MaterialRateEntity,
+  RequesterEntity,
+  CollectionRequestEntity,
+  WasteWalletEntity,
+  WalletTransactionEntity,
+  WithdrawalRequestEntity,
+  CreditRateEntity,
+  CatalogItemEntity,
+  CatalogRedemptionEntity,
 ];

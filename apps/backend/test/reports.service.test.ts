@@ -1,24 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { verifyMerkleProof } from "@proofchain/shared";
 import { BatchesService } from "../src/batches/batches.service";
-import { ReportsService as ReportsServiceCtor } from "../src/reports/reports.service";
 import type { ReportsService } from "../src/reports/reports.service";
-import {
-  AnchorRecordEntity,
-  BatchEntity,
-  CollectionEventEntity,
-  CollectorEntity,
-  CustodyTransferEntity,
-  HubEntity,
-} from "../src/database/entities";
+import { BatchEntity, CollectionEventEntity, CustodyTransferEntity } from "../src/database/entities";
 import { createTestDatabase, type TestDatabase } from "./support/database";
 import { insertEvent, seedHub, type SeededHub } from "./support/fixtures";
-import {
-  buildAnchorAttemptsService,
-  buildMaterialsService,
-  buildReportsService,
-  stubLedgerVerification,
-} from "./support/services";
+import { buildMaterialsService, buildReportsService } from "./support/services";
 
 /**
  * The audit artifact IS the product: everything else exists to be able to
@@ -38,10 +25,7 @@ beforeEach(async () => {
   batches = new BatchesService(
     db.dataSource.getRepository(BatchEntity),
     db.dataSource.getRepository(CollectionEventEntity),
-    db.dataSource.getRepository(AnchorRecordEntity),
     db.dataSource,
-    stubLedgerVerification(),
-    buildAnchorAttemptsService(db.dataSource),
     buildMaterialsService(db.dataSource),
   );
   seeded = await seedHub(db.dataSource);
@@ -116,28 +100,10 @@ describe("ReportsService.buildAuditReport", () => {
     expect(report.collectors[0]!.name).toBe(seeded.collector.name);
   });
 
-  it("reports no on-chain section until the batch is anchored", async () => {
-    const batchId = await sealedBatch([3]);
-    expect((await reports.buildAuditReport(batchId)).onChain).toBeNull();
-
-    await batches.recordAnchor(batchId, {
-      merkleRoot: (await batches.findOne(batchId)).merkleRoot!,
-      stellarTxHash: "a".repeat(64),
-      stellarLedger: 4033690,
-      network: "testnet",
-      dataEntryKey: `proofchain:batch:${batchId}`,
-      anchoredAt: "2026-03-01T12:00:00.000Z",
-    });
-
-    expect(await reports.buildAuditReport(batchId)).toMatchObject({
-      onChain: { stellarTxHash: "a".repeat(64), stellarLedger: 4033690 },
-    });
-  });
-
-  it("states plainly what the anchor does not prove", async () => {
+  it("states plainly what the proof does not show", async () => {
     const report = await reports.buildAuditReport(await sealedBatch([1]));
 
-    // A buyer reading "anchored on Stellar" as "the plastic was real" is the
+    // A buyer reading "in the Merkle tree" as "the plastic was real" is the
     // misreading with the largest downside for everyone involved.
     expect(report.attestationNotes.join(" ")).toMatch(/does not.*prove the material/i);
   });
@@ -267,61 +233,6 @@ function parseCsvRow(row: string): string[] {
   fields.push(current);
   return fields;
 }
-
-describe("ReportsService — ledger confirmation", () => {
-  async function anchoredReport(confirmation: Parameters<typeof stubLedgerVerification>[0]) {
-    const batchId = await sealedBatch([7]);
-    await batches.recordAnchor(batchId, {
-      merkleRoot: (await batches.findOne(batchId)).merkleRoot!,
-      stellarTxHash: "a".repeat(64),
-      stellarLedger: 4033690,
-      network: "testnet",
-      dataEntryKey: `proofchain:batch:${batchId}`,
-      anchoredAt: "2026-03-01T12:00:00.000Z",
-    });
-
-    const withLedger = new ReportsServiceCtor(
-      db.dataSource.getRepository(BatchEntity),
-      db.dataSource.getRepository(CollectionEventEntity),
-      db.dataSource.getRepository(CustodyTransferEntity),
-      db.dataSource.getRepository(CollectorEntity),
-      db.dataSource.getRepository(HubEntity),
-      db.dataSource.getRepository(AnchorRecordEntity),
-      stubLedgerVerification(confirmation),
-    );
-    return withLedger.buildAuditReport(batchId);
-  }
-
-  it("publishes a confirmed anchor as confirmed", async () => {
-    const report = await anchoredReport({
-      checked: true,
-      rootMatchesLedger: true,
-      memoMatches: true,
-      detail: "ledger confirms the sealed root",
-    });
-
-    expect(report.onChain?.ledgerConfirmation.rootMatchesLedger).toBe(true);
-    expect(report.onChain?.ledgerConfirmation.memoMatches).toBe(true);
-    expect(report.onChain?.ledgerConfirmation.checkedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
-
-  it("keeps a ledger contradiction out of the Merkle proof verdict", async () => {
-    const report = await anchoredReport({ checked: true, rootMatchesLedger: false });
-
-    // allProofsValid is a statement about the document's internal consistency
-    // and is still true. Merging the two would leave a reader unable to tell a
-    // tampered event list from an anchor that never landed.
-    expect(report.proof.allProofsValid).toBe(true);
-    expect(report.onChain?.ledgerConfirmation.rootMatchesLedger).toBe(false);
-  });
-
-  it("reports an unreachable Horizon as unchecked, not as a failed anchor", async () => {
-    const report = await anchoredReport({ detail: "could not reach Horizon: timed out" });
-
-    expect(report.onChain?.ledgerConfirmation.rootMatchesLedger).toBeNull();
-    expect(report.onChain?.ledgerConfirmation.detail).toMatch(/could not reach/);
-  });
-});
 
 describe("ReportsService — photo evidence", () => {
   it("marks an event with no uploaded photo as unavailable", async () => {

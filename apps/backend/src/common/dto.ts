@@ -241,41 +241,6 @@ export class AdvanceStatusDto {
   status: BatchStatus;
 }
 
-export class RecordAnchorDto {
-  @Matches(SHA256_HEX) merkleRoot: string;
-
-  @Matches(/^[0-9a-f]{64}$/, { message: "stellarTxHash must be a 64-char hex hash" })
-  stellarTxHash: string;
-
-  @IsNumber() @Min(1) stellarLedger: number;
-
-  @IsIn(["testnet", "public"]) network: "testnet" | "public";
-
-  @IsString() @IsNotEmpty() @MaxLength(64) dataEntryKey: string;
-
-  @IsISO8601({ strict: true }) anchoredAt: string;
-}
-
-/**
- * The worker reporting an attempt that produced no anchor.
- *
- * `detail` is free text on purpose — it is whatever Horizon or the SDK said,
- * and an operator debugging a stuck batch needs the real message rather than a
- * code we mapped it onto and lost the specifics of. Bounded, because it reaches
- * us from a network failure path where the message length is not ours to
- * control.
- */
-export class RecordAnchorFailureDto {
-  @IsIn(["failed", "unverified"]) outcome: "failed" | "unverified";
-
-  @IsOptional() @IsString() @MaxLength(2000) detail?: string;
-
-  /** Present for `unverified`: the submission that may have cost a real fee. */
-  @IsOptional()
-  @Matches(/^[0-9a-f]{64}$/, { message: "stellarTxHash must be a 64-char hex hash" })
-  stellarTxHash?: string;
-}
-
 export class CreateCustodyTransferDto {
   @IsString() @IsNotEmpty() @MaxLength(200) fromParty: string;
   @IsString() @IsNotEmpty() @MaxLength(200) toParty: string;
@@ -286,6 +251,38 @@ export class CreateCustodyTransferDto {
   @IsOptional() @IsString() @MaxLength(500) reason?: string;
 
   @IsISO8601({ strict: true }) transferredAt: string;
+}
+
+export class RecordReweighDto {
+  @IsNumber({ maxDecimalPlaces: 3 }) @Min(0.001) verifiedWeightKg: number;
+
+  @IsOptional() @IsString() @MaxLength(500) notes?: string;
+}
+
+export class CreatePayoutDto {
+  @IsUUID() collectorId: string;
+
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID("4", { each: true })
+  eventReweighIds: string[];
+
+  @IsString() @IsNotEmpty() @MaxLength(50) method: string;
+}
+
+export class MarkPayoutPaidDto {
+  @IsOptional() @IsString() @MaxLength(200) payoutRef?: string;
+}
+
+export class CreateMaterialRateDto {
+  @MaterialCode()
+  materialCode: string;
+
+  @IsOptional() @IsUUID() hubId?: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) ratePerKg: number;
+
+  @IsOptional() @IsISO8601({ strict: true }) effectiveFrom?: string;
 }
 
 export class LoginDto {
@@ -364,4 +361,101 @@ export class ListEventsQueryDto {
   @IsOptional() @IsBoolean() @Type(() => Boolean) hasPhoto?: boolean;
 
   @IsOptional() @IsNumber() @Min(1) @Max(500) @Type(() => Number) limit?: number;
+}
+
+export class CreateCreditRateDto {
+  @MaterialCode()
+  materialCode: string;
+
+  @IsOptional() @IsUUID() hubId?: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) creditsPerKg: number;
+
+  @IsOptional() @IsISO8601({ strict: true }) effectiveFrom?: string;
+}
+
+/**
+ * Self-registration for a requester (a household/business asking for a
+ * pickup) — a distinct trust boundary from `CreateUserDto`, which only an
+ * admin can call. Same password floor as an operator account: a requester's
+ * account guards a real waste-credit balance, so it is worth the same
+ * offline-cracking resistance.
+ */
+export class RegisterRequesterDto {
+  @IsString() @IsNotEmpty() @MaxLength(200) name: string;
+
+  @IsEmail() email: string;
+
+  @IsString()
+  @MinLength(PASSWORD_MIN_LENGTH, {
+    message: `password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+  })
+  @MaxLength(200)
+  password: string;
+
+  @IsOptional()
+  @Matches(/^\+?[0-9]{7,15}$/, { message: "phone must be an E.164-style number" })
+  phone?: string;
+}
+
+export class RequesterLoginDto {
+  @IsEmail() email: string;
+
+  // Deliberately looser than the registration floor, same reasoning as
+  // `LoginDto` above: this validates an attempt to use an existing
+  // credential, not the credential's strength.
+  @IsString() @MinLength(8) @MaxLength(200) password: string;
+}
+
+export class CreateCollectionRequestDto {
+  @IsUUID() hubId: string;
+
+  @MaterialCode()
+  material: MaterialType;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  @Max(100_000)
+  estimatedWeightKg?: number;
+
+  @IsOptional() @IsString() @MaxLength(500) address?: string;
+
+  @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+}
+
+export class AssignRequestDto {
+  @IsUUID() collectorId: string;
+}
+
+export class FulfillRequestDto {
+  @IsUUID() eventId: string;
+}
+
+export class RedeemCodeDto {
+  @IsString() @IsNotEmpty() @MaxLength(16) redemptionCode: string;
+}
+
+export class RequestWithdrawalDto {
+  @IsNumber({ maxDecimalPlaces: 3 }) @Min(0.001) amountCredits: number;
+}
+
+export class MarkWithdrawalPaidDto {
+  @IsOptional() @IsString() @MaxLength(200) payoutRef?: string;
+}
+
+export class CreateCatalogItemDto {
+  @IsString() @IsNotEmpty() @MaxLength(200) name: string;
+
+  @IsOptional() @IsString() @MaxLength(500) description?: string;
+
+  @IsString() @IsNotEmpty() @MaxLength(50) category: string;
+
+  @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) costCredits: number;
+
+  @IsOptional() @IsNumber() @Min(0) stock?: number;
+}
+
+export class RedeemCatalogItemDto {
+  @IsUUID() itemId: string;
 }

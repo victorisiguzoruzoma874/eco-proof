@@ -6,11 +6,14 @@ loadDotenv();
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { DataSource } from "typeorm";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { loadConfig } from "./config/configuration";
 import { isAllowedOrigin } from "./config/cors";
 import { trustProxyWarning } from "./config/trust-proxy";
+import { isInMemoryMode } from "./database/in-memory-flag";
+import { seedDevelopmentData } from "./database/seed";
 
 async function bootstrap(): Promise<void> {
   const config = loadConfig();
@@ -61,25 +64,29 @@ async function bootstrap(): Promise<void> {
       app,
       new DocumentBuilder()
         .setTitle("ProofChain API")
-        .setDescription("Verified waste-to-credit platform — MVP (Stellar testnet)")
+        .setDescription("Verified waste-to-credit platform — MVP")
         .setVersion("0.1.0")
         .addBearerAuth()
-        // POST /batches/:id/anchor is guarded by AnchorWorkerGuard, not the JWT
-        // guard, so the bearer token above cannot reach it. The controller
-        // already declares @ApiSecurity("anchor-worker-token"); without the
-        // matching scheme registered here that annotation refers to nothing and
-        // Swagger renders no field for it, leaving the endpoint untestable from
-        // the UI. The name must stay in sync with the controller's string.
-        .addApiKey(
-          { type: "apiKey", name: "x-anchor-worker-token", in: "header" },
-          "anchor-worker-token",
-        )
         .build(),
     );
     SwaggerModule.setup("docs", app, doc);
   }
 
   app.enableShutdownHooks();
+
+  // `--in-memory`: app.module.ts already swapped the DataSource for a pg-mem
+  // one with no data in it (synchronize() builds empty tables). Seed it here,
+  // once, against the exact instance the app is serving from — there is no
+  // separate `npm run seed` process for an in-memory database, since its data
+  // would vanish the moment that process exited.
+  if (isInMemoryMode()) {
+    const dataSource = app.get(DataSource);
+    await seedDevelopmentData(dataSource);
+    logger.warn(
+      "--in-memory: serving from a pg-mem database with no Postgres involved. " +
+        "All data is lost on restart — this is a local dev convenience, never a deployment mode.",
+    );
+  }
 
   await app.listen(config.port, "0.0.0.0");
   // The docs are only mounted outside production, so naming them

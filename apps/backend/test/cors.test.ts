@@ -62,7 +62,7 @@ describe("isAllowedOrigin in production", () => {
   });
 
   it("allows a request with no Origin header", () => {
-    // curl, health checks and the anchor worker carry no browser credentials.
+    // curl and health checks carry no browser credentials.
     expect(inProd(undefined)).toBe(true);
   });
 });

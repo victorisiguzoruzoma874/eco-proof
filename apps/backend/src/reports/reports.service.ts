@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import {
   hashLeaf,
   merkleProof,
@@ -9,15 +9,15 @@ import {
   type MerkleProofStep,
 } from "@proofchain/shared";
 import {
-  AnchorRecordEntity,
   BatchEntity,
   CollectionEventEntity,
   CollectorEntity,
   CustodyTransferEntity,
+  EventReweighEntity,
   HubEntity,
+  PayoutEntity,
+  PayoutItemEntity,
 } from "../database/entities";
-import { explorerUrl } from "../batches/batches.service";
-import { LedgerVerificationService } from "../ledger/ledger-verification.service";
 
 /**
  * The audit artifact — the document a PRO, verifier or credit buyer accepts as
@@ -25,8 +25,8 @@ import { LedgerVerificationService } from "../ledger/ledger-verification.service
  * system exists to be able to generate it.
  *
  * Deliberately self-contained: a recipient can re-derive the Merkle root from
- * the event list in this file alone, then compare it against the Stellar
- * transaction, without calling our API or trusting our word.
+ * the event list in this file alone, without calling our API or trusting our
+ * word.
  */
 
 export interface AuditReportEvent {
@@ -106,32 +106,32 @@ export interface AuditReport {
     nodeHashAlgorithm: "sha256(0x01 || left || right)";
     ordering: "capturedAt ASC, id ASC";
   };
-  onChain: {
-    network: string;
-    stellarTxHash: string;
-    stellarLedger: number;
-    dataEntryKey: string;
-    anchoredAt: string;
-    explorerUrl: string;
-    /**
-     * What the ledger said when we last asked, rather than what our database
-     * remembers writing. The report's other proof fields are all recomputed
-     * from data in the document; this is the one claim that cannot be, so it
-     * carries its own freshness and its own tri-state.
-     *
-     * null means we could not reach Horizon — not that the anchor failed.
-     */
-    ledgerConfirmation: {
-      rootMatchesLedger: boolean | null;
-      memoMatches: boolean;
-      dataEntryMatches: boolean;
-      checkedAt: string;
-      detail: string;
-    };
-  } | null;
   events: AuditReportEvent[];
   /**
-   * Stated plainly so nobody mistakes anchoring for proof of the physical fact.
+   * The hub re-weigh against each event's claimed weight, where one has been
+   * recorded. An event with no reweigh yet simply has no entry here — that is
+   * the normal state for anything not yet brought to a hub for verification.
+   */
+  reweighs: {
+    eventId: string;
+    claimedWeightKg: number;
+    verifiedWeightKg: number;
+    variancePct: number;
+    status: string;
+  }[];
+  /** Payment runs covering one or more of this batch's reweighs. */
+  payouts: {
+    id: string;
+    collectorId: string;
+    amount: number;
+    currency: string;
+    method: string;
+    status: string;
+    paidAt: string | null;
+  }[];
+  /**
+   * Stated plainly so nobody mistakes a Merkle proof for proof of the physical
+   * fact.
    */
   attestationNotes: string[];
 }
@@ -147,9 +147,11 @@ export class ReportsService {
     @InjectRepository(CollectorEntity)
     private readonly collectors: Repository<CollectorEntity>,
     @InjectRepository(HubEntity) private readonly hubs: Repository<HubEntity>,
-    @InjectRepository(AnchorRecordEntity)
-    private readonly anchors: Repository<AnchorRecordEntity>,
-    private readonly ledger: LedgerVerificationService,
+    @InjectRepository(EventReweighEntity)
+    private readonly eventReweighs: Repository<EventReweighEntity>,
+    @InjectRepository(PayoutEntity) private readonly payouts: Repository<PayoutEntity>,
+    @InjectRepository(PayoutItemEntity)
+    private readonly payoutItems: Repository<PayoutItemEntity>,
   ) {}
 
   async buildAuditReport(batchId: string): Promise<AuditReport> {
@@ -174,21 +176,27 @@ export class ReportsService {
       order: { capturedAt: "ASC", id: "ASC" },
     });
 
-    const [transfers, anchor] = await Promise.all([
-      this.custody.find({ where: { batchId }, order: { transferredAt: "ASC" } }),
-      this.anchors.findOne({ where: { batchId } }),
-    ]);
+    const transfers = await this.custody.find({
+      where: { batchId },
+      order: { transferredAt: "ASC" },
+    });
 
-    // Asked at render time, not read from our own row. A report is often the
-    // only artifact a buyer keeps, and the whole document is worth less if its
-    // one external claim is the one thing nobody rechecked.
-    const confirmation = anchor
-      ? await this.ledger.verify({
-          stellarTxHash: anchor.stellarTxHash,
-          merkleRoot: anchor.merkleRoot,
-          dataEntryKey: anchor.dataEntryKey,
-        })
-      : null;
+    // Recomputed from source rows on every call, same as everything else in
+    // this report: reweighs and payouts are never cached against the batch.
+    const eventIds = events.map((e) => e.id);
+    const reweighRows =
+      eventIds.length > 0 ? await this.eventReweighs.find({ where: { eventId: In(eventIds) } }) : [];
+
+    const reweighIds = reweighRows.map((r) => r.id);
+    const payoutItemRows =
+      reweighIds.length > 0
+        ? await this.payoutItems.find({ where: { eventReweighId: In(reweighIds) } })
+        : [];
+    const payoutIds = [...new Set(payoutItemRows.map((p) => p.payoutId))];
+    const payoutRows =
+      payoutIds.length > 0
+        ? await this.payouts.find({ where: { id: In(payoutIds) }, order: { createdAt: "ASC" } })
+        : [];
 
     const collectorIds = [...new Set(events.map((e) => e.collectorId))];
     const collectorRows = collectorIds.length ? await this.collectors.findByIds(collectorIds) : [];
@@ -294,26 +302,25 @@ export class ReportsService {
         nodeHashAlgorithm: "sha256(0x01 || left || right)",
         ordering: "capturedAt ASC, id ASC",
       },
-      onChain: anchor
-        ? {
-            network: anchor.network,
-            stellarTxHash: anchor.stellarTxHash,
-            stellarLedger: Number(anchor.stellarLedger),
-            dataEntryKey: anchor.dataEntryKey,
-            anchoredAt: anchor.anchoredAt.toISOString(),
-            explorerUrl: explorerUrl(anchor.network, anchor.stellarTxHash),
-            ledgerConfirmation: {
-              rootMatchesLedger: confirmation?.rootMatchesLedger ?? null,
-              memoMatches: confirmation?.memoMatches ?? false,
-              dataEntryMatches: confirmation?.dataEntryMatches ?? false,
-              checkedAt: confirmation?.checkedAt ?? new Date().toISOString(),
-              detail: confirmation?.detail ?? "ledger not consulted",
-            },
-          }
-        : null,
       events: reportEvents,
+      reweighs: reweighRows.map((r) => ({
+        eventId: r.eventId,
+        claimedWeightKg: Number(r.claimedWeightKg),
+        verifiedWeightKg: Number(r.verifiedWeightKg),
+        variancePct: Number(r.variancePct),
+        status: r.status,
+      })),
+      payouts: payoutRows.map((p) => ({
+        id: p.id,
+        collectorId: p.collectorId,
+        amount: Number(p.amount),
+        currency: p.currency,
+        method: p.method,
+        status: p.status,
+        paidAt: p.paidAt?.toISOString() ?? null,
+      })),
       attestationNotes: [
-        "The Stellar anchor proves these records existed unaltered at the anchored ledger time. It does not, by itself, prove the material weighed was real or additional.",
+        "The Merkle proof shows each event is part of the sealed batch's committed set. It does not, by itself, prove the material weighed was real or additional.",
         "Source-level assurance comes from device signatures, hub geofencing, photo evidence and duplicate detection, recorded per event above.",
         "Each event's photoHash was signed by the capture device. Where photoAvailable is true, the stored bytes have been checked to hash to that value; download the photo and recompute the sha256 to confirm it independently.",
         "Baseline and additionality figures must be completed against the selected Verra Plastic Waste Reduction Standard track before submission.",

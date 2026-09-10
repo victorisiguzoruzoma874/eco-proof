@@ -4,17 +4,9 @@ import { BadRequestException, ConflictException, NotFoundException } from "@nest
 import type { DataSource } from "typeorm";
 import { hashLeaf, merkleRootHex, verifyMerkleProof } from "@proofchain/shared";
 import { BatchesService } from "../../src/batches/batches.service";
-import {
-  AnchorRecordEntity,
-  BatchEntity,
-  CollectionEventEntity,
-} from "../../src/database/entities";
+import { BatchEntity, CollectionEventEntity } from "../../src/database/entities";
 import { createTestDataSource, resetTables } from "./database";
-import {
-  buildAnchorAttemptsService,
-  buildMaterialsService,
-  stubLedgerVerification,
-} from "../support/services";
+import { buildMaterialsService } from "../support/services";
 import { at, insertEvent, seedFixtures, type Fixtures } from "./fixtures";
 
 /**
@@ -46,16 +38,9 @@ beforeEach(async () => {
   service = new BatchesService(
     dataSource.getRepository(BatchEntity),
     dataSource.getRepository(CollectionEventEntity),
-    dataSource.getRepository(AnchorRecordEntity),
     dataSource,
-    // The ledger read-back is stubbed: these tests are about the Merkle root
-    // and the transaction boundaries around sealing, and a real Horizon call
-    // would make every one of them depend on a public network being up.
-    stubLedgerVerification(),
-    // Not stubbed — the pending-anchor assertions depend on real attempt rows.
-    buildAnchorAttemptsService(dataSource),
-    // Real too: opening a batch checks the catalogue, and these tests run
-    // against a migrated database where the seed materials exist.
+    // Real: opening a batch checks the catalogue, and these tests run against
+    // a migrated database where the seed materials exist.
     buildMaterialsService(dataSource),
   );
 });
@@ -349,99 +334,6 @@ describe("BatchesService — status transitions", () => {
   });
 });
 
-describe("BatchesService — recording the anchor", () => {
-  const TX_HASH = "a".repeat(64);
-
-  async function sealedBatch(): Promise<BatchEntity> {
-    const batch = await service.create(fixtures.hub.id, "PET");
-    const event = await insertEvent(dataSource, fixtures, { capturedAt: at(0) });
-    await service.addEvents(batch.id, [event.id]);
-    return service.seal(batch.id);
-  }
-
-  function anchorInput(overrides: Partial<Parameters<BatchesService["recordAnchor"]>[1]> = {}) {
-    return {
-      merkleRoot: "b".repeat(64),
-      stellarTxHash: TX_HASH,
-      stellarLedger: 1_234_567,
-      network: "testnet" as const,
-      dataEntryKey: "proofchain:batch",
-      anchoredAt: new Date().toISOString(),
-      ...overrides,
-    };
-  }
-
-  it("records the transaction against a sealed batch", async () => {
-    const batch = await sealedBatch();
-
-    const anchor = await service.recordAnchor(
-      batch.id,
-      anchorInput({ merkleRoot: batch.merkleRoot! }),
-    );
-
-    expect(anchor.stellarTxHash).toBe(TX_HASH);
-    expect(anchor.merkleRoot).toBe(batch.merkleRoot);
-    expect(Number(anchor.stellarLedger)).toBe(1_234_567);
-  });
-
-  it("refuses a root that disagrees with the sealed batch", async () => {
-    // An anchor pointing at the wrong data is worse than no anchor: it is a
-    // public, permanent claim about a batch it does not describe.
-    const batch = await sealedBatch();
-
-    await expect(
-      service.recordAnchor(batch.id, anchorInput({ merkleRoot: "c".repeat(64) })),
-    ).rejects.toThrow(ConflictException);
-  });
-
-  it("refuses to anchor a batch that was never sealed", async () => {
-    const batch = await service.create(fixtures.hub.id, "PET");
-
-    await expect(service.recordAnchor(batch.id, anchorInput())).rejects.toThrow(ConflictException);
-  });
-
-  it("is idempotent when the worker retries the same transaction", async () => {
-    const batch = await sealedBatch();
-    const input = anchorInput({ merkleRoot: batch.merkleRoot! });
-
-    const first = await service.recordAnchor(batch.id, input);
-    const second = await service.recordAnchor(batch.id, input);
-
-    expect(second.id).toBe(first.id);
-    expect(await dataSource.getRepository(AnchorRecordEntity).count()).toBe(1);
-  });
-
-  it("refuses a second, different transaction for the same batch", async () => {
-    const batch = await sealedBatch();
-    await service.recordAnchor(batch.id, anchorInput({ merkleRoot: batch.merkleRoot! }));
-
-    await expect(
-      service.recordAnchor(
-        batch.id,
-        anchorInput({ merkleRoot: batch.merkleRoot!, stellarTxHash: "d".repeat(64) }),
-      ),
-    ).rejects.toThrow(ConflictException);
-  });
-
-  it("lists sealed unanchored batches as the worker's queue, oldest first", async () => {
-    const first = await sealedBatch();
-    const second = await sealedBatch();
-
-    const pending = await service.pendingAnchor();
-    expect(pending.map((p) => p.id)).toEqual([first.id, second.id]);
-
-    await service.recordAnchor(first.id, anchorInput({ merkleRoot: first.merkleRoot! }));
-
-    const afterAnchoring = await service.pendingAnchor();
-    expect(afterAnchoring.map((p) => p.id)).toEqual([second.id]);
-  });
-
-  it("does not queue an open batch for anchoring", async () => {
-    await service.create(fixtures.hub.id, "PET");
-    expect(await service.pendingAnchor()).toEqual([]);
-  });
-});
-
 describe("BatchesService — verifying one event", () => {
   it("produces a proof that validates against the sealed root", async () => {
     const batch = await service.create(fixtures.hub.id, "PET");
@@ -470,32 +362,6 @@ describe("BatchesService — verifying one event", () => {
       );
       expect(verification.leaf).toBe(hashLeaf(event.payloadHash));
     }
-  });
-
-  it("reports no on-chain record until the batch is anchored, then reports it", async () => {
-    const batch = await service.create(fixtures.hub.id, "PET");
-    const event = await insertEvent(dataSource, fixtures, { capturedAt: at(0) });
-    await service.addEvents(batch.id, [event.id]);
-    const sealed = await service.seal(batch.id);
-
-    expect((await service.verifyEvent(batch.id, event.id)).onChain).toBeNull();
-
-    await service.recordAnchor(batch.id, {
-      merkleRoot: sealed.merkleRoot!,
-      stellarTxHash: "e".repeat(64),
-      stellarLedger: 42,
-      network: "testnet",
-      dataEntryKey: "proofchain:batch",
-      anchoredAt: new Date().toISOString(),
-    });
-
-    const verified = await service.verifyEvent(batch.id, event.id);
-    expect(verified.onChain).toMatchObject({
-      network: "testnet",
-      txHash: "e".repeat(64),
-      ledger: 42,
-    });
-    expect(verified.onChain?.explorerUrl).toContain("stellar.expert");
   });
 
   it("refuses to verify against a batch that has not been sealed", async () => {

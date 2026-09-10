@@ -43,7 +43,7 @@ export function isLocalNetworkOrigin(origin: string): boolean {
 /**
  * `origin` is undefined for same-origin requests, curl, and server-to-server
  * calls. Those carry no browser credentials, so there is nothing for CORS to
- * protect and blocking them would only break the anchor worker and health checks.
+ * protect and blocking them would only break server-to-server calls and health checks.
  */
 export function isAllowedOrigin(
   origin: string | undefined,

@@ -29,8 +29,6 @@ export type BatchStatus = (typeof BATCH_STATUSES)[number];
 export const KYC_LEVELS = ["none", "basic", "verified"] as const;
 export type KycLevel = (typeof KYC_LEVELS)[number];
 
-export type StellarNetwork = "testnet" | "public";
-
 /**
  * Integrity verdicts attached to every event by the server-side v1 checks.
  * `pass` does not mean "true tonne" — it means "nothing detectably wrong".
@@ -163,28 +161,6 @@ export interface CustodyTransfer {
   transferredAt: string;
 }
 
-/** Links off-chain data to its on-chain proof. */
-export interface AnchorRecord {
-  id: string;
-  batchId: string;
-  merkleRoot: string;
-  stellarTxHash: string;
-  stellarLedger: number;
-  network: StellarNetwork;
-  dataEntryKey: string;
-  anchoredAt: string;
-}
-
-/**
- * How one attempt to anchor a batch ended.
- *
- * `unverified` is deliberately distinct from `failed`: the transaction was
- * submitted and may have cost a real fee, and it may still appear on the ledger
- * a moment later. Treating it as an outright failure would hide a case that
- * needs a human to look at Horizon.
- */
-export type AnchorAttemptOutcome = "failed" | "unverified" | "succeeded";
-
 /** One sibling step on the path from a leaf to the root. */
 export interface MerkleProofStep {
   hash: string;
@@ -200,12 +176,4 @@ export interface EventVerification {
   proof: MerkleProofStep[];
   merkleRoot: string;
   proofValid: boolean;
-  onChain: {
-    network: StellarNetwork;
-    txHash: string;
-    ledger: number;
-    explorerUrl: string;
-    /** Set once the root has been read back off the ledger and compared. */
-    rootMatchesLedger: boolean | null;
-  } | null;
 }

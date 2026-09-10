@@ -10,6 +10,18 @@ import { HubLocality1786500000000 } from "../../src/database/migrations/17865000
 import { Materials1786600000000 } from "../../src/database/migrations/1786600000000-Materials";
 import { MaterialExamples1786700000000 } from "../../src/database/migrations/1786700000000-MaterialExamples";
 import { RemoveLocation1786800000000 } from "../../src/database/migrations/1786800000000-RemoveLocation";
+import { HubWeightCeiling1786900000000 } from "../../src/database/migrations/1786900000000-HubWeightCeiling";
+import { RemoveAnchoring1787000000000 } from "../../src/database/migrations/1787000000000-RemoveAnchoring";
+import { EventReweighs1787100000000 } from "../../src/database/migrations/1787100000000-EventReweighs";
+import { Payouts1787200000000 } from "../../src/database/migrations/1787200000000-Payouts";
+import { MaterialRates1787300000000 } from "../../src/database/migrations/1787300000000-MaterialRates";
+import { Requesters1787400000000 } from "../../src/database/migrations/1787400000000-Requesters";
+import { CollectionRequests1787500000000 } from "../../src/database/migrations/1787500000000-CollectionRequests";
+import { WasteWallets1787600000000 } from "../../src/database/migrations/1787600000000-WasteWallets";
+import { CreditRates1787700000000 } from "../../src/database/migrations/1787700000000-CreditRates";
+import { WithdrawalRequests1787800000000 } from "../../src/database/migrations/1787800000000-WithdrawalRequests";
+import { CatalogItems1787900000000 } from "../../src/database/migrations/1787900000000-CatalogItems";
+import { CatalogRedemptions1788000000000 } from "../../src/database/migrations/1788000000000-CatalogRedemptions";
 
 /**
  * Migrations are listed as classes rather than as the `src/**\/migrations/*.ts`
@@ -29,6 +41,18 @@ const MIGRATIONS = [
   Materials1786600000000,
   MaterialExamples1786700000000,
   RemoveLocation1786800000000,
+  HubWeightCeiling1786900000000,
+  RemoveAnchoring1787000000000,
+  EventReweighs1787100000000,
+  Payouts1787200000000,
+  MaterialRates1787300000000,
+  Requesters1787400000000,
+  CollectionRequests1787500000000,
+  WasteWallets1787600000000,
+  CreditRates1787700000000,
+  WithdrawalRequests1787800000000,
+  CatalogItems1787900000000,
+  CatalogRedemptions1788000000000,
 ];
 
 function assertAllMigrationsRegistered(): void {

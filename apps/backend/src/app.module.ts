@@ -2,7 +2,10 @@ import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ALL_ENTITIES } from "./database/entities";
+import { createInMemoryDataSource } from "./database/in-memory-datasource";
+import { isInMemoryMode } from "./database/in-memory-flag";
 import { loadConfig } from "./config/configuration";
 import { AuthModule, JwtAuthGuard } from "./auth/auth.module";
 import { AuthController } from "./auth/auth.controller";
@@ -16,6 +19,15 @@ import { BatchesModule } from "./batches/batches.module";
 import { CustodyModule } from "./custody/custody.module";
 import { ReportsModule } from "./reports/reports.module";
 import { MaterialsModule } from "./materials/materials.module";
+import { ReweighModule } from "./reweigh/reweigh.module";
+import { PayoutsModule } from "./payouts/payouts.module";
+import { MaterialRatesModule } from "./material-rates/material-rates.module";
+import { RequestersModule } from "./requesters/requesters.module";
+import { RequestsModule } from "./requests/requests.module";
+import { WalletModule } from "./wallet/wallet.module";
+import { CreditRatesModule } from "./credit-rates/credit-rates.module";
+import { WithdrawalsModule } from "./withdrawals/withdrawals.module";
+import { CatalogModule } from "./catalog/catalog.module";
 import { RateLimitGuard } from "./common/rate-limit.guard";
 
 @Module({
@@ -40,6 +52,20 @@ import { RateLimitGuard } from "./common/rate-limit.guard";
           logging: process.env.TYPEORM_LOGGING === "true",
         };
       },
+      // `--in-memory` (see database/in-memory-flag.ts) swaps the real Postgres
+      // connection for an in-process pg-mem database — nothing else about the
+      // options above changes, this only intercepts how the DataSource itself
+      // gets built. Every other boot path (including production) falls
+      // through to TypeORM's own default construction from `options`.
+      dataSourceFactory: async (options) => {
+        if (isInMemoryMode()) {
+          return createInMemoryDataSource();
+        }
+        if (!options) {
+          throw new Error("TypeORM did not provide connection options");
+        }
+        return new DataSource(options).initialize();
+      },
     }),
     AuthModule,
     UsersModule,
@@ -50,6 +76,15 @@ import { RateLimitGuard } from "./common/rate-limit.guard";
     CustodyModule,
     ReportsModule,
     MaterialsModule,
+    ReweighModule,
+    PayoutsModule,
+    MaterialRatesModule,
+    RequestersModule,
+    RequestsModule,
+    WalletModule,
+    CreditRatesModule,
+    WithdrawalsModule,
+    CatalogModule,
   ],
   controllers: [RootController, AuthController, HealthController],
   providers: [
