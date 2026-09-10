@@ -1,3 +1,35 @@
+/*
+ * Fonts are bundled, not fetched.
+ *
+ * This app is opened by a collector standing at a weighbridge with one bar of
+ * signal or none at all, and `sw.js` only cache-firsts same-origin `/assets/`.
+ * A <link> to fonts.gstatic.com would therefore be a face that renders in the
+ * fallback on exactly the days the app matters most — and the fallback is a
+ * different width, so the weight numerals would reflow after the fact.
+ *
+ * Importing them here makes Vite emit content-hashed woff2 into `/assets/`,
+ * which the service worker already caches permanently and correctly.
+ */
+/*
+ * Latin only, and only the cuts this screen actually sets. The full packages
+ * ship Cyrillic, Greek and Vietnamese in both woff2 and woff — files this
+ * service worker would faithfully cache forever and no collector would ever
+ * render a glyph from.
+ *
+ * The wordmark is the only serif on the screen, so Fraunces comes in on its
+ * `wght` axis alone: no italic, no optical-size range, no `SOFT`/`WONK`
+ * alternates. On a metered SIM those axes are bytes spent on two words.
+ */
+import "@fontsource-variable/fraunces/wght.css";
+/* 400 for body, plus the three weights this screen actually sets. Audited
+   against `styles.css` rather than imported wholesale — each unused cut is
+   ~23 kB the service worker would cache forever on a field phone. */
+import "@fontsource/ibm-plex-sans/latin-400.css";
+import "@fontsource/ibm-plex-sans/latin-500.css";
+import "@fontsource/ibm-plex-sans/latin-600.css";
+import "@fontsource/ibm-plex-sans/latin-700.css";
+/* One weight of mono, for the device key and the lookup code. */
+import "@fontsource/ibm-plex-mono/latin-400.css";
 import "./styles.css";
 import { type MaterialType, type WeighInPayload } from "@shared/types";
 import { examplesLine, materialLabel } from "@shared/materials";
@@ -8,7 +40,14 @@ import {
   pickableMaterials,
   refreshCatalogue,
 } from "./lib/materials";
-import { hashPhoto, loadOrCreateIdentity, randomId, randomNonce, signWeighIn } from "./lib/identity";
+import {
+  computeEventPayloadHash,
+  hashPhoto,
+  loadOrCreateIdentity,
+  randomId,
+  randomNonce,
+  signWeighIn,
+} from "./lib/identity";
 import * as queue from "./lib/queue";
 import {
   backendUrl,
@@ -71,6 +110,18 @@ let photo: Blob | null = null;
 let photoHash: string | null = null;
 let scale: ScaleConnection | null = null;
 let notice: { tone: "good" | "bad" | "warn"; text: string } | null = null;
+
+/**
+ * The proof of the weigh-in just queued.
+ *
+ * `lookupCode` is the same slice of `payloadHash` the dashboard's printable
+ * proof page shows (`payloadHash.slice(0, 10)`) — computed here on-device, so it
+ * is available the instant the record is signed, offline included, rather than
+ * waiting on a server round trip. Cleared by the next commit, not by a timer:
+ * it is meant to stay on screen until the collector has had a chance to note it
+ * down or move on to the next sack.
+ */
+let lastProof: { lookupCode: string; weightKg: number } | null = null;
 
 /**
  * The camera is a sensor behind its own permission and can fail on its own, so
@@ -406,6 +457,29 @@ function noticeHtml(): string {
   return `<p class="notice" data-tone="${notice.tone}" role="status">${escapeHtml(notice.text)}</p>`;
 }
 
+/**
+ * The post-commit confirmation: "Weigh-in queued" plus its lookup code.
+ *
+ * A separate card rather than folding into `notice` — the lookup code is
+ * something a collector may want to copy down or photograph, not a one-line
+ * status that scrolls away with the next message. It survives on screen across
+ * re-renders (the queue tallies below tick up, a sync completes) until the next
+ * commit replaces it, and it never blocks capturing the next weigh-in.
+ */
+function proofCardHtml(): string {
+  if (!lastProof) return "";
+  return `
+      <div class="proof" role="status">
+        <span class="label">Weigh-in queued · ${escapeHtml(lastProof.weightKg.toFixed(3))} kg</span>
+        <span class="proof-code">${escapeHtml(lastProof.lookupCode)}</span>
+        <p class="hint">
+          Lookup code for this weigh-in. The full printable proof — with photo and
+          collector details — is on the dashboard once this hub can view it; give
+          this code to whoever verifies the drop-off.
+        </p>
+      </div>`;
+}
+
 function provisionScreen(): string {
   return `
     ${masthead()}
@@ -496,6 +570,7 @@ async function captureScreen(): Promise<string> {
           <span>Collector</span>
         </span>
         <strong style="font-size:1.125rem">${escapeHtml(p.collectorName)}</strong>
+        <button class="ghost small" type="button" id="forget-device">Forget this device</button>
       </div>
 
       <div class="field">
@@ -515,6 +590,7 @@ async function captureScreen(): Promise<string> {
       </div>
 
       ${noticeHtml()}
+      ${proofCardHtml()}
 
       <div class="field">
         <span class="label">
@@ -609,7 +685,13 @@ async function captureScreen(): Promise<string> {
           <li data-status="${r.status}">
             <span class="record-weight">${r.payload.weightKg.toFixed(3)} kg</span>
             <span class="meta">${escapeHtml(materialLabel(r.payload.material, cachedCatalogue()))} · ${new Date(r.createdAt).toLocaleTimeString()}</span>
+            <span class="record-code" title="Lookup code">${escapeHtml(computeEventPayloadHash(r.payload).slice(0, 10))}</span>
             ${r.lastError ? `<span class="record-note">${escapeHtml(r.lastError)}</span>` : ""}
+            ${
+              r.status === "rejected"
+                ? `<button class="ghost small record-discard" type="button" data-discard="${r.id}">Discard</button>`
+                : ""
+            }
           </li>`,
                 )
                 .join("")
@@ -798,6 +880,13 @@ function wireCapture(): void {
 
   on("commit", "click", commit);
   on("sync", "click", runSync);
+  on("forget-device", "click", forgetDevice);
+
+  for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-discard]")) {
+    btn.addEventListener("click", () => {
+      void discardItem(btn.dataset.discard!).catch((error) => reportUnexpected("discard", error));
+    });
+  }
 }
 
 // ---------------------------------------------------------------- actions
@@ -867,6 +956,10 @@ async function commit(): Promise<void> {
   // re-renders, so a committed weigh-in must blank it or the next one inherits it.
   if (weightInput) weightInput.value = "";
   notice = { tone: "good", text: `Signed and queued ${payload.weightKg.toFixed(3)} kg.` };
+  lastProof = {
+    lookupCode: computeEventPayloadHash(payload).slice(0, 10),
+    weightKg: payload.weightKg,
+  };
 
   await render();
   void runSync();
@@ -891,6 +984,39 @@ async function runSync(): Promise<void> {
   } finally {
     syncInFlight = false;
   }
+}
+
+/**
+ * Remove one permanently-rejected record so the queue list stops showing it.
+ *
+ * A rejection here is a definitive server "no" — commonly a device the
+ * server no longer recognises (re-enrolled elsewhere, or a fresh backend with
+ * no memory of a prior one) — not a transient failure `runSync` would ever
+ * retry. Without this the only way to clear it was DevTools.
+ */
+async function discardItem(id: string): Promise<void> {
+  await queue.discardRejected(id);
+  await render();
+}
+
+/**
+ * Drop back to the provisioning screen so this phone can re-enrol.
+ *
+ * Only clears `PROVISION_KEY` — which hub/collector this phone is assigned
+ * to — not the signing identity itself (`loadOrCreateIdentity`'s own storage
+ * key, untouched). Re-enrolling issues a fresh server-side device record for
+ * the *same* keypair, so nothing already-synced or still-queued under the old
+ * enrolment is invalidated by this; it only fixes captures from here on,
+ * which is exactly what's needed when the server no longer recognises this
+ * device — most commonly a dev backend that was reset out from under it.
+ */
+function forgetDevice(): void {
+  if (!window.confirm("Forget this device? You will need to sign back in and re-enrol before capturing again.")) {
+    return;
+  }
+  localStorage.removeItem(PROVISION_KEY);
+  provisioning = null;
+  void render();
 }
 
 async function drainQueue(): Promise<void> {

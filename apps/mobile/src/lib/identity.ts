@@ -1,4 +1,5 @@
 import { ed25519 } from "@noble/curves/ed25519";
+import { sha256 } from "@noble/hashes/sha2";
 import { canonicalEventPayload } from "@shared/canonical";
 import type { WeighInPayload } from "@shared/types";
 
@@ -121,4 +122,18 @@ export async function saveDeviceMeta(store: SecureStorePort, meta: DeviceMeta): 
 export function signWeighIn(payload: WeighInPayload, identity: DeviceIdentity): string {
   const message = new TextEncoder().encode(canonicalEventPayload(payload));
   return toBase64(ed25519.sign(message, fromHex(identity.privateKeyHex)));
+}
+
+/**
+ * The event's `payloadHash`, computed on-device.
+ *
+ * Byte-for-byte the same result the server stores: `canonicalEventPayload` is
+ * the identical pure encoder both sides import, and sha256 of its UTF-8 bytes is
+ * exactly what `eventPayloadHash` (packages/shared/src/canonical.ts) computes
+ * with `node:crypto` server-side. That means the dashboard's lookup code — the
+ * first chars of `payloadHash` — can be shown to the collector the instant a
+ * weigh-in is signed, with no server round trip and no waiting on sync.
+ */
+export function computeEventPayloadHash(payload: WeighInPayload): string {
+  return toHex(sha256(new TextEncoder().encode(canonicalEventPayload(payload))));
 }

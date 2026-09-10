@@ -13,6 +13,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
     "@noble/curves": "^1.7.0",
     "@noble/hashes": "^1.6.1",
     "@proofchain/shared": "*",

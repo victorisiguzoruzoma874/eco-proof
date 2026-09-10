@@ -76,6 +76,20 @@ export async function hashPhoto(blob: Blob): Promise<string> {
   return toHex(sha256(buffer));
 }
 
+/**
+ * The event's `payloadHash`, computed on-device.
+ *
+ * Byte-for-byte the same result the server stores: `canonicalEventPayload` is
+ * the identical pure encoder both sides import, and sha256 of its UTF-8 bytes
+ * is exactly what `eventPayloadHash` (packages/shared/src/canonical.ts) computes
+ * with `node:crypto` server-side. That means the dashboard's lookup code — the
+ * first chars of `payloadHash` — can be shown to the collector the instant a
+ * weigh-in is signed, with no server round trip and no waiting on sync.
+ */
+export function computeEventPayloadHash(payload: WeighInPayload): string {
+  return toHex(sha256(new TextEncoder().encode(canonicalEventPayload(payload))));
+}
+
 export function randomNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return toHex(bytes);

@@ -109,6 +109,24 @@ export async function counts(): Promise<Record<QueueStatus, number>> {
   return result;
 }
 
+/**
+ * Remove one rejected record from the queue.
+ *
+ * Deliberately narrower than a general-purpose `remove(id)`: the module
+ * comment above promises records are "only ever removed after the server
+ * acknowledges them," and a rejected record is the one status where that
+ * acknowledgement (a definitive, signature-level "no") has already happened —
+ * there is nothing left to retry, unlike `queued`/`syncing`, and nothing to
+ * lose, unlike `synced`. Silently no-ops on anything else, including a
+ * missing id, so a stale UI click can never delete work in flight.
+ */
+export async function discardRejected(id: string): Promise<void> {
+  const database = await db();
+  const existing = (await database.get(STORE, id)) as QueuedWeighIn | undefined;
+  if (!existing || existing.status !== "rejected") return;
+  await database.delete(STORE, id);
+}
+
 /** Drop synced records older than the retention window to bound storage growth. */
 export async function pruneSynced(olderThanDays = 14): Promise<number> {
   const database = await db();

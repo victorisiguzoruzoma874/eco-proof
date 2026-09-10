@@ -43,12 +43,42 @@ export const radius = {
   lg: 22,
 } as const;
 
+/**
+ * The three faces the whole product uses — see `docs/typography.md`.
+ *
+ * React Native will not synthesise a weight from a variable font the way a
+ * browser does: each weight is a separately registered family, and setting
+ * `fontWeight` on a custom family is silently ignored on Android. So weight is
+ * chosen by picking a family here, and `fontWeight` appears nowhere in this app.
+ *
+ * The names are the keys `App.tsx` registers with `useFonts`; nothing renders
+ * until that resolves, so a style referencing one of these is never applied to
+ * an unloaded family.
+ */
+export const font = {
+  regular: "IBMPlexSans_400Regular",
+  medium: "IBMPlexSans_500Medium",
+  semibold: "IBMPlexSans_600SemiBold",
+  bold: "IBMPlexSans_700Bold",
+  /* The wordmark and nothing else. There is no editorial writing on a screen
+     someone is holding beside a scale. */
+  display: "Fraunces_600SemiBold",
+  /*
+   * Machine strings: a lookup code, a device key. This used to be
+   * `Platform.select({ ios: "Menlo", android: "monospace" })` — two different
+   * typefaces depending on the handset, for the one string a collector has to
+   * transcribe exactly. Plex Mono is the same face the dashboard and the
+   * capture app now use, so a code looks identical wherever it is read.
+   */
+  mono: "IBMPlexMono_400Regular",
+} as const;
+
 export const type = {
-  display: { fontSize: 56, fontWeight: "700" },
-  title: { fontSize: 24, fontWeight: "700" },
-  body: { fontSize: 16, fontWeight: "400" },
-  label: { fontSize: 13, fontWeight: "600", letterSpacing: 0.8 },
-  mono: { fontSize: 12, fontWeight: "400" },
+  display: { fontFamily: font.bold, fontSize: 56 },
+  title: { fontFamily: font.bold, fontSize: 24 },
+  body: { fontFamily: font.regular, fontSize: 16 },
+  label: { fontFamily: font.semibold, fontSize: 13, letterSpacing: 0.8 },
+  mono: { fontFamily: font.mono, fontSize: 12 },
 } as const;
 
 export const statusColor: Record<string, string> = {

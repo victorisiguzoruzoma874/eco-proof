@@ -12,9 +12,9 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import type { MaterialType, WeighInPayload } from "@shared/types";
 import { formatKg, weightProblem } from "@shared/integrity-copy";
-import { colors, radius, space, type } from "../theme";
+import { colors, font, radius, space, type } from "../theme";
 import type { DeviceIdentity, DeviceMeta } from "../lib/identity";
-import { signWeighIn } from "../lib/identity";
+import { computeEventPayloadHash, signWeighIn } from "../lib/identity";
 import { enqueue, type QueuedWeighIn } from "../lib/queue";
 import { appStore, hashPhotoFile, randomNonce } from "../lib/native";
 import { getBackendUrl } from "../lib/api";
@@ -29,7 +29,7 @@ import {
 interface Props {
   identity: DeviceIdentity;
   device: DeviceMeta;
-  onCaptured: () => void;
+  onCaptured: (proof: { lookupCode: string; weightKg: number }) => void;
 }
 
 /**
@@ -158,7 +158,12 @@ export function CaptureScreen({ identity, device, onCaptured }: Props) {
       await enqueue(appStore, record);
 
       setWeight("");
-      onCaptured();
+      // Available the instant this is signed — no server round trip, since
+      // payloadHash is a pure function of the payload the phone already holds.
+      onCaptured({
+        lookupCode: computeEventPayloadHash(payload).slice(0, 10),
+        weightKg: payload.weightKg,
+      });
     } catch (error) {
       // Loud, not silent: an unrecorded weigh-in is unpaid work, and the
       // collector can still redo it while the material is in front of them.
@@ -304,7 +309,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.xs,
     borderRadius: radius.sm,
   },
-  cameraBadgeText: { color: colors.text, fontSize: 12, fontWeight: "600" },
+  cameraBadgeText: { color: colors.text, fontSize: 12, fontFamily: font.semibold },
 
   label: {
     ...type.label,
@@ -316,10 +321,10 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     fontSize: type.display.fontSize,
-    fontWeight: "700",
+    fontFamily: font.bold,
     paddingVertical: 0,
   },
-  unit: { color: colors.textMuted, fontSize: 22, fontWeight: "600", paddingBottom: space.sm },
+  unit: { color: colors.textMuted, fontSize: 22, fontFamily: font.semibold, paddingBottom: space.sm },
 
   materials: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   chip: {
@@ -331,13 +336,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  chipText: { color: colors.textMuted, fontSize: 15, fontWeight: "700" },
+  chipText: { color: colors.textMuted, fontSize: 15, fontFamily: font.bold },
   chipTextActive: { color: colors.onAccent },
   /** The signed code, under the human name. */
   chipCode: {
     color: colors.textFaint,
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: font.semibold,
     letterSpacing: 0.6,
     marginTop: 1,
   },
@@ -352,7 +357,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     paddingVertical: 3,
   },
-  productText: { color: colors.textMuted, fontSize: 12, fontWeight: "600" },
+  productText: { color: colors.textMuted, fontSize: 12, fontFamily: font.semibold },
 
   labelRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
   labelNote: { ...type.label, color: colors.textFaint, marginTop: space.md },
@@ -383,7 +388,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primaryDisabled: { opacity: 0.4 },
-  primaryLabel: { color: colors.onAccent, fontSize: 17, fontWeight: "700" },
+  primaryLabel: { color: colors.onAccent, fontSize: 17, fontFamily: font.bold },
   busyRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
 
   footnote: {
