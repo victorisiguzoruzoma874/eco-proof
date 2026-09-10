@@ -1,6 +1,6 @@
 # ProofChain Runbook
 
-**Operational guide for running ProofChain on testnet.**
+**Operational guide for running ProofChain.**
 
 This guide covers prerequisites, infrastructure setup, service startup, common tasks, and troubleshooting.
 
@@ -9,7 +9,7 @@ This guide covers prerequisites, infrastructure setup, service startup, common t
 - **Node.js 20.11 or later** — Verify with `node --version`.
 - **npm 10+** — Usually bundled with Node 20+.
 - **Docker** — For Postgres and Redis. If running on Linux, use the user socket (systemctl --user).
-- **curl** — For testing endpoints and creating Stellar accounts.
+- **curl** — For testing endpoints.
 - **A machine with 2GB+ free RAM** — Postgres, Redis, and Node services run concurrently.
 
 ### Docker Setup on Linux
@@ -94,13 +94,12 @@ REDIS_URL=redis://localhost:6380
 PORT=3000
 JWT_SECRET=change-me-in-production
 
-# Stellar (testnet)
-STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
-STELLAR_NETWORK_PASSPHRASE=Test SDF Network ; September 2015
-STELLAR_SECRET=             # <-- Set this after creating an account
+# Weigh-in photos
+PHOTO_STORAGE_DIR=./var/photos
+MAX_PHOTO_BYTES=8388608
 ```
 
-**In production**, change `JWT_SECRET` to a strong random string. `STELLAR_SECRET` is the ed25519 secret key of the anchor worker's account — keep it private and rotate if compromised.
+**In production**, change `JWT_SECRET` to a strong random string.
 
 ## Database Setup
 
@@ -150,49 +149,7 @@ Expected output:
 ✓ Operator user created: operator@proofchain.local
 ```
 
-The seed stores the device private keys in `apps/backend/var/seed-devices.json` for use by the demo script.
-
-## Stellar Setup
-
-### Create and Fund a Testnet Account
-
-The anchor worker needs a Stellar testnet account with a small balance to pay for transaction fees (~0.00001 XLM per anchor).
-
-```bash
-npm run stellar:account
-```
-
-This runs `services/anchor-worker/scripts/create-testnet-account.mjs`, which:
-1. Generates a random ed25519 keypair
-2. Funds it via Friendbot (free testnet faucet)
-3. Prints the keys
-
-Output:
-
-```
-Public : GBUQWP3BOUZX34LOCALWHATSAMPLE...
-Secret : SBXXXXXXXXXXXXXXXXXXXXXXXXXXXX...
-
-Funded on testnet via Friendbot.
-STELLAR_SECRET=SBXXXXXXXXXXXXXXXXXXXXXXXXXXXX...
-```
-
-**Copy the `STELLAR_SECRET` line into `.env`:**
-
-```bash
-# Edit .env and paste:
-STELLAR_SECRET=SBXXXXXXXXXXXXXXXXXXXXXXXXXXXX...
-```
-
-**Important:** Never reuse this key on the public network. Testnet lumens have no value, but the key pattern is the same.
-
-### Verify Funding
-
-```bash
-curl "https://horizon-testnet.stellar.org/accounts/GBUQWP3BOUZX34LOCALWHATSAMPLE..." | jq '.balances'
-```
-
-You should see a balance of 10,000 XLM (Friendbot's default).
+The seed stores the device private keys in `apps/backend/var/seed-devices.json` for use by the demo script. It also writes a default `material_rates` row (50/kg, no hub override) for every active material — **a payout will fail with a clear 400 if no rate exists for the material/hub it's asked to price**, so this is what makes `POST /payouts` work out of the box in a freshly seeded environment. Set real rates via `POST /material-rates` before relying on the seeded figure for anything but local testing.
 
 ## Service Startup
 
@@ -219,30 +176,9 @@ Health check:
 curl http://localhost:3000/health | jq .
 ```
 
-### Anchor Worker
-
-**Terminal 2:**
-
-```bash
-cd services/anchor-worker
-npm run dev
-```
-
-The worker polls the backend every 15 seconds for sealed-but-unanchored batches. Output:
-
-```
-anchor-worker up. backend=http://localhost:3000 poll=15000ms
-```
-
-Once a batch is sealed (see next section), you'll see:
-
-```
-[anchored] batch=... weight=125.3kg events=9 tx=3fb0f496f209507098e6439c646a60d6a576de856a28afbb4f44598b77dc512f ledger=4033690
-```
-
 ### Dashboard (Optional)
 
-**Terminal 3:**
+**Terminal 2:**
 
 ```bash
 cd apps/dashboard
@@ -253,7 +189,7 @@ Access at `http://localhost:3001`. Shows batch management, event lists, and cust
 
 ### Capture PWA (Optional)
 
-**Terminal 4:**
+**Terminal 3:**
 
 ```bash
 cd apps/capture
@@ -273,7 +209,7 @@ Starts the Expo CLI. Press `i` for iOS or `a` for Android (requires simulator/de
 
 ## Common Tasks
 
-### Create a Test Batch and Anchor It
+### Create a Test Batch and Run It Through Re-weigh and Payout
 
 1. **Open a batch:**
    ```bash
@@ -282,15 +218,17 @@ Starts the Expo CLI. Press `i` for iOS or `a` for Android (requires simulator/de
      -H "Authorization: Bearer <JWT_TOKEN>" \
      -d '{"hubId": "<hub_uuid>", "material": "PET"}'
    ```
-   
+
    (You need a JWT token from logging in first; see the demo script for how it's obtained.)
 
 2. **Run the demo** (easier):
    ```bash
    node scripts/demo-e2e.mjs
    ```
-   
-   This does all the work: creates events, batches, seals, anchors, and verifies.
+
+   This does all the work: creates events, batches, seals, records custody,
+   records a within-tolerance and a flagged re-weigh, creates and pays out a
+   payout, and downloads the audit report to confirm it all shows up there.
 
 ### List Batches
 
@@ -304,56 +242,75 @@ curl http://localhost:3000/batches | jq '.'
 curl http://localhost:3000/batches/<batch_id>/report | jq '.'
 ```
 
-### Check Pending Anchors
+The `reweighs` and `payouts` arrays in the response are recomputed from source
+rows on every request — nothing about them is cached against the batch — so
+this is always a live view of what's been recorded and paid for that batch.
+
+### Record a Re-weigh
 
 ```bash
-curl http://localhost:3000/batches/pending-anchor | jq '.'
+curl -X POST http://localhost:3000/events/<event_id>/reweigh \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"verifiedWeightKg": 14.2}'
 ```
 
-The anchor worker periodically polls this endpoint. Batches in backoff after a failed attempt are deliberately absent — a batch missing from this list is not necessarily anchored.
-
-### Check Whether Anchoring Is Healthy
-
-This is the endpoint to reach for first when a batch has not anchored. It requires an operator token.
+If the verified weight is more than ±5% off the event's claimed weight, this
+fails with a 400 asking for `notes` — a flagged re-weigh must carry a stated
+reason. Add it and resubmit:
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:3000/batches/anchor-health | jq '{awaitingAnchor, stuck, unanchoredWeightKg}'
+curl -X POST http://localhost:3000/events/<event_id>/reweigh \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"verifiedWeightKg": 11.0, "notes": "material was noticeably damp"}'
 ```
 
-- `awaitingAnchor` — sealed batches with no anchor. A small number that keeps changing is normal.
-- `stuck` — batches that have failed six or more times. **This is the number to alert on.** Anything above zero needs a person.
-- `unanchoredWeightKg` — the same fact in business units: weight that cannot be sold until a root reaches the ledger.
+There is no endpoint to edit or delete a re-weigh once recorded — one event
+gets exactly one. A mis-keyed value has to be corrected out of band today (see
+[Known Limitations](../README.md#known-limitations) in the README).
 
-For the detail on a specific batch:
+### Create and Pay a Payout
 
-```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:3000/batches/anchor-health | jq '.batches[] | select(.stuck)'
-```
-
-`lastDetail` carries the error verbatim from Horizon or the Stellar SDK. The common causes:
-
-| `lastDetail` contains | Cause | Fix |
-|---|---|---|
-| `op_underfunded`, `tx_insufficient_balance` | The anchor account has run out of XLM | Re-fund via Friendbot (testnet) — see [Stellar Setup](#stellar-setup) |
-| `tx_insufficient_fee` | Network base fee has risen above `BASE_FEE` | Raise the fee in `services/anchor-worker/src/anchor.ts` and redeploy the worker |
-| `tx_bad_seq` | Two workers sharing one Stellar key | Run exactly one anchor worker per key |
-| `504`, `timed out`, `ECONNREFUSED` | Horizon unreachable | Usually transient; backoff will retry. Check `STELLAR_HORIZON_URL` |
-| `unauthorised (401)` | `ANCHOR_WORKER_TOKEN` mismatch | Make the worker's and the backend's values identical |
-
-### Recover a Stuck Batch
-
-Nothing needs to be reset by hand. Once the underlying cause is fixed, the batch is retried on its next scheduled attempt — at most an hour away, since backoff is capped.
-
-To confirm it recovered:
+A payout needs a `material_rates` row for the reweigh's material (and,
+optionally, hub) to price against — **the seed writes a default global rate
+for every active material**, so a freshly seeded environment already has one.
+Check what's configured:
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:3000/batches/anchor-health | jq '.stuck'
+  "http://localhost:3000/material-rates?materialCode=PET" | jq '.'
 ```
 
-The batch leaves the list entirely once anchored. Its failure history is kept and remains visible on the batch page in the dashboard, which is intentional: "anchored, eventually, after nine failures" is a different operational fact from "anchored first time" and it should not be erased by the recovery.
+Add or override one:
+
+```bash
+curl -X POST http://localhost:3000/material-rates \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"materialCode": "PET", "ratePerKg": 55}'
+```
+
+Then create the payout, covering one or more of a single collector's
+re-weighs, and mark it paid once the collector has actually been handed the
+money:
+
+```bash
+curl -X POST http://localhost:3000/payouts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"collectorId": "<collector_id>", "eventReweighIds": ["<reweigh_id>"], "method": "cash"}'
+
+curl -X POST http://localhost:3000/payouts/<payout_id>/mark-paid \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"payoutRef": "receipt-0042"}'
+```
+
+`POST /payouts` refuses a reweigh that: doesn't belong to the given
+`collectorId`, is already attached to another payout, or has
+`status: "rejected"`. `mark-paid` refuses a payout that isn't `pending` — it
+can only be paid once.
 
 ### View Event Details
 
@@ -385,34 +342,6 @@ systemctl --user start docker-desktop
 
 Then retry your docker command.
 
-### "fetch failed" to Horizon or Friendbot — but curl works
-
-**Symptom:** `stellar:account` or the ledger read-back fail with `fetch failed` /
-`ETIMEDOUT`, while `curl` to the
-same URL from the same machine returns 200. The give-away is the timing: Node
-fails in **well under a second**, which is a connect failure, not a timeout.
-
-**Cause:** the hosts are dual-stack, the network's IPv6 path is black-holed, and
-Node prefers the AAAA record. `curl` picks IPv4. Common on phone tethering and
-some mobile ISPs. Confirm with:
-
-```bash
-getent ahosts horizon-testnet.stellar.org        # shows both A and AAAA
-node -e 'fetch("https://horizon-testnet.stellar.org/").then(r=>console.log(r.status)).catch(e=>console.log("fail",e.cause?.code))'
-node --dns-result-order=ipv4first -e 'fetch("https://horizon-testnet.stellar.org/").then(r=>console.log(r.status))'
-```
-
-**Solution:** prefer IPv4 for outbound calls:
-
-```bash
-export NODE_OPTIONS=--dns-result-order=ipv4first
-```
-
-Related: on a slow uplink the default timeouts are too tight. Horizon has been
-measured at 11.6 s on a tethered link, where the 8 s `HORIZON_TIMEOUT_MS` default
-silently degrades every audit report's ledger confirmation to "unchecked —
-Horizon unreachable". Raise `HORIZON_TIMEOUT_MS` to 20000 on such a connection.
-
 ### "Database migrations failed"
 
 **Symptom:** `TypeORM migration error` or `table already exists`
@@ -426,46 +355,24 @@ Horizon unreachable". Raise `HORIZON_TIMEOUT_MS` to 20000 on such a connection.
    # Then re-run migrations and seed
    ```
 
-### "Anchor worker can't reach backend"
+### "no material rate configured for ..." on POST /payouts
 
-**Symptom:** `backend returned 500` or `ECONNREFUSED`
+**Symptom:** `400 Bad Request` from `POST /payouts`, with a message naming the
+material and hub it checked.
 
-**Solution:**
-1. Check backend is running: `curl http://localhost:3000/health`
-2. If backend is down, restart it: `cd apps/backend && npm run start:dev`
-3. Anchor worker will retry on the next poll (default 15s)
+**Cause:** No `material_rates` row resolves for that material — neither a
+hub-specific override nor the `hubId: null` global default. This happens on a
+fresh database if the seed hasn't run, or for a material added by hand after
+seeding.
 
-### "Stellar account not funded"
+**Solution:** Add a rate before retrying the payout:
 
-**Symptom:** `STELLAR_SECRET is not set` or `insufficient native asset balance`
-
-**Solution:**
-1. Create an account: `npm run stellar:account`
-2. Copy the secret to `.env`
-3. Verify funding: `curl "https://horizon-testnet.stellar.org/accounts/<public_key>" | jq '.balances'`
-4. If the account shows 0 XLM, re-run Friendbot manually:
-   ```bash
-   PUBKEY=$(node -e "console.log(require('@stellar/stellar-sdk').Keypair.fromSecret('YOUR_SECRET').publicKey())")
-   curl "https://friendbot.stellar.org?addr=$PUBKEY"
-   ```
-
-### "Transaction submitted but anchor worker doesn't record it"
-
-**Symptom:** Batch seals and anchors appear in Horizon, but the backend still shows no anchor record.
-
-**Solution:**
-1. Check the anchor worker logs — if verification fails, it doesn't record (safety feature):
-   ```
-   [unverified] batch=... tx=... memo=false data=false — not recording
-   ```
-2. Verify the Stellar tx manually: `curl https://horizon-testnet.stellar.org/transactions/<tx_hash> | jq '.memo'`
-3. Check the backend's anchor endpoint is reachable and has the correct `x-anchor-worker-token` header.
-4. The worker now reports this case as an `unverified` attempt with the transaction hash. Find it with:
-   ```bash
-   curl -H "Authorization: Bearer $TOKEN" \
-     http://localhost:3000/batches/anchor-health | jq '.batches[] | select(.lastOutcome == "unverified")'
-   ```
-   An `unverified` attempt is more serious than a plain failure: a transaction was submitted and may have cost a real fee, and it may still settle. Check the hash on Horizon before assuming the anchor did not happen — anchoring the same root twice is wasteful but harmless, whereas recording an anchor that was never confirmed is not.
+```bash
+curl -X POST http://localhost:3000/material-rates \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"materialCode": "PET", "ratePerKg": 55}'
+```
 
 ### "TypeScript build errors"
 
@@ -541,13 +448,12 @@ npm run db:up
 
 ## Deploying the pilot (Neon + Render)
 
-This deploys the **testnet pilot**: a hosted instance operators and auditors can
-reach, anchoring to the Stellar test network. It is not a production credit
-issuer — see [Before calling it production](#before-calling-it-production).
+This deploys a hosted instance operators, hub staff and auditors can reach. It
+is not a production credit issuer — see
+[Before calling it production](#before-calling-it-production).
 
-Two processes run: the **API** and the **anchor worker**. Both are built from
-the one `Dockerfile` at the repo root and differ only in their command, so they
-cannot drift apart on how a Merkle leaf is hashed. `render.yaml` declares both.
+One process runs: the **API**. It's built from the `Dockerfile` at the repo
+root. `render.yaml` declares it.
 
 ### 1. Database (Neon)
 
@@ -559,20 +465,8 @@ database needs no preparation.
 
 ### 2. Secrets
 
-Generate two, and keep them out of the repository:
-
-```bash
-openssl rand -hex 32   # JWT_SECRET
-openssl rand -hex 32   # ANCHOR_WORKER_TOKEN
-```
-
-`ANCHOR_WORKER_TOKEN` must be **identical** on the API and the worker. It
-authorises `POST /batches/:id/anchor`; if they disagree, every write-back is
-rejected with a 401 and batches sit sealed but unanchored — visibly stuck rather
-than silently wrong, but stuck all the same.
-
-`STELLAR_SECRET` is the funded testnet account that signs anchor transactions.
-Generate one with `npm run stellar:account`. The worker needs it; the API does not.
+`JWT_SECRET` is generated by Render itself (`generateValue: true` in
+`render.yaml`) — nothing to create by hand for a default deploy.
 
 ### 3. Apply the blueprint
 
@@ -582,9 +476,7 @@ Point Render at the repo (Blueprints → New Blueprint Instance). It reads
 | Variable | Service | Value |
 |---|---|---|
 | `DATABASE_URL` | api | Neon pooled connection string |
-| `ANCHOR_WORKER_TOKEN` | api + worker | the same generated token |
 | `CORS_ORIGINS` | api | dashboard and capture origins, comma-separated |
-| `STELLAR_SECRET` | worker | funded testnet secret |
 
 `JWT_SECRET` is generated by Render. `TRUST_PROXY=1` is already set — it must
 be, or `req.ip` is Render's load balancer and the login and ingest rate limits
@@ -658,31 +550,27 @@ docker build -t proofchain .
 docker run -p 3000:3000 \
   -e NODE_ENV=production -e TRUST_PROXY=1 \
   -e DATABASE_URL='postgres://…?sslmode=require' \
-  -e JWT_SECRET=… -e ANCHOR_WORKER_TOKEN=… \
+  -e JWT_SECRET=… \
   -e CORS_ORIGINS='https://dashboard.example.com' \
-  proofchain                                        # API
-docker run -e … proofchain node services/anchor-worker/dist/index.js   # worker
+  proofchain
 ```
-
-Keep the worker at **one instance**. Two would race to anchor the same batch;
-the backend rejects the second write-back, but the duplicate Stellar
-transaction has already been paid for by then.
 
 ### Before calling it production
 
 Still outstanding, and none of it is on the deployment path:
 
 1. Security audit of the integrity checks and signing path
-2. Stellar **public** network account (this pilot is testnet)
-3. Verra accreditation as a credit issuer
-4. Photo storage — bytes are hashed but never stored, so a buyer cannot check a
+2. Verra accreditation as a credit issuer
+3. Photo storage — bytes are hashed but never stored, so a buyer cannot check a
    `photoHash` against an image
-5. Shared-store rate limiting — the limiter is per-process, so it weakens as
+4. Shared-store rate limiting — the limiter is per-process, so it weakens as
    soon as the API runs more than one instance
-6. Backups and restore drills (Neon's point-in-time restore is the starting
+5. Backups and restore drills (Neon's point-in-time restore is the starting
    point, not the plan)
-7. Monitoring and alerting: logs, metrics, uptime, and an alert on batches that
-   stay sealed-but-unanchored
+6. Monitoring and alerting: logs, metrics, uptime, and an alert on the
+   `material_rates` table being empty for a material that's about to be paid out
+7. A structured payout-destination and disbursal integration — see
+   [Known Limitations](../README.md#known-limitations) in the README
 
 ## Testing the capture PWA on a real phone
 
@@ -722,16 +610,16 @@ An administrator maintains them at **Dashboard → Materials**, or over the API.
 ### The one rule
 
 A material **code** is part of the signed weigh-in payload, so it is hashed into
-the Merkle root and anchored on the ledger. It cannot be renamed or deleted once a
+the Merkle root of every batch containing it. It cannot be renamed or deleted once a
 collector has signed it — that would invalidate the audit report of every batch
-containing it, and no migration can undo a root that is already on a public
-ledger.
+containing it, and no migration can undo a Merkle root already handed to an
+auditor as proof of a sealed batch's contents.
 
 So the catalogue separates three things:
 
 | Field | Changeable? | Notes |
 |---|---|---|
-| `code` | **Never** | `PET`. Signed, hashed, anchored. Append-only. |
+| `code` | **Never** | `PET`. Signed, hashed into every batch's Merkle root. Append-only. |
 | `name` | Freely | `Clear drink bottles`. Presentation only, never signed. |
 | `active` | Freely | `false` retires it: hidden from capture, history untouched. |
 

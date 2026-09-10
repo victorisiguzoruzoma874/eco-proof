@@ -17,12 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    env:
-      # The anchor worker refuses to run without this rather than silently
-      # posting write-backs the backend would reject, so its tests need a value
-      # present. Nothing here talks to a real backend; the value is arbitrary.
-      ANCHOR_WORKER_TOKEN: ci-test-token
-
     steps:
       - uses: actions/checkout@v5
 
@@ -115,10 +109,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    # The Dockerfile is the deployment artifact for both the API and the anchor
-    # worker. Nothing else in CI exercises it, so without this job it rots
-    # quietly and the breakage surfaces during a deploy — the worst moment to
-    # discover that a workspace manifest was added and `npm ci` now fails.
+    # The Dockerfile is the deployment artifact for the API. Nothing else in CI
+    # exercises it, so without this job it rots quietly and the breakage
+    # surfaces during a deploy — the worst moment to discover that a workspace
+    # manifest was added and `npm ci` now fails.
     steps:
       - uses: actions/checkout@v5
 
@@ -136,9 +130,8 @@ jobs:
 
       # An image that builds but cannot start is still a broken build, and the
       # usual cause is a production dependency that only ever resolved because
-      # devDependencies were installed. Both entrypoints are checked: they ship
-      # in the same image and are deployed as separate services.
-      - name: Both entrypoints load
+      # devDependencies were installed.
+      - name: API entrypoint loads
         run: |
           # Reaching config validation means the whole Nest graph resolved
           # inside the pruned tree. It stops there because no env is supplied,
@@ -147,11 +140,6 @@ jobs:
             > /tmp/api.log 2>&1 || true
           grep -q "missing required environment variable" /tmp/api.log \
             || { echo "API entrypoint failed for an unexpected reason:"; cat /tmp/api.log; exit 1; }
-
-          # The worker only starts its poll loop when it is the entry module,
-          # so requiring it resolves every import without running anything.
-          docker run --rm proofchain:ci \
-            node -e "require('/app/services/anchor-worker/dist/index.js')"
 
   contracts:
     name: Soroban contract (clippy, test, wasm)

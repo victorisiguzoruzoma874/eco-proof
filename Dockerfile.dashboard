@@ -1,10 +1,9 @@
 # ProofChain operator dashboard.
 #
 # Separate from the root Dockerfile because it ships a different thing. That one
-# builds the trust kernel — the backend and the anchor worker, which must agree
-# byte-for-byte on how a leaf is hashed — and deliberately carries no browser
-# toolchain. This builds a Next.js server. Sharing one image would mean every
-# backend deploy also rebuilt the frontend, and vice versa.
+# builds the backend API and deliberately carries no browser toolchain. This
+# builds a Next.js server. Sharing one image would mean every backend deploy
+# also rebuilt the frontend, and vice versa.
 #
 # The dashboard is proxied whole by Caddy rather than served as static files:
 # Next.js in server mode owns its own routing and streaming. See
@@ -26,7 +25,6 @@ COPY apps/backend/package.json apps/backend/
 COPY apps/capture/package.json apps/capture/
 COPY apps/dashboard/package.json apps/dashboard/
 COPY apps/mobile/package.json apps/mobile/
-COPY services/anchor-worker/package.json services/anchor-worker/
 
 RUN npm ci --fetch-retries=5 --fetch-retry-maxtimeout=60000
 

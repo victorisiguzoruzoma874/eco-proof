@@ -1,13 +1,4 @@
-# ProofChain backend + anchor worker.
-#
-# One image, two entrypoints. The backend and the worker share the trust kernel
-# in packages/shared and must never disagree about how a leaf is hashed or a
-# root is built — shipping them from a single build makes that impossible by
-# construction, and halves the deploy surface. The process to run is chosen by
-# the command:
-#
-#   docker run … proofchain node apps/backend/dist/main.js        # API
-#   docker run … proofchain node services/anchor-worker/dist/index.js  # worker
+# ProofChain backend.
 #
 # Debian slim rather than Alpine: argon2 (password hashing) is a native module,
 # and prebuilt binaries are published for glibc. On musl it would be compiled
@@ -37,7 +28,6 @@ COPY apps/backend/package.json apps/backend/
 COPY apps/capture/package.json apps/capture/
 COPY apps/dashboard/package.json apps/dashboard/
 COPY apps/mobile/package.json apps/mobile/
-COPY services/anchor-worker/package.json services/anchor-worker/
 
 RUN npm ci --fetch-retries=5 --fetch-retry-maxtimeout=60000
 
@@ -51,11 +41,9 @@ WORKDIR /app
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY apps/backend apps/backend
-COPY services/anchor-worker services/anchor-worker
 
 RUN npm run build -w @proofchain/shared \
-    && npm run build -w @proofchain/backend \
-    && npm run build -w @proofchain/anchor-worker
+    && npm run build -w @proofchain/backend
 
 # Drop devDependencies from the tree that ships. Done here rather than with a
 # second `npm ci --omit=dev` so the workspace symlinks (node_modules/@proofchain/*
@@ -80,8 +68,6 @@ COPY --from=build --chown=node:node /app/packages/shared/package.json ./packages
 COPY --from=build --chown=node:node /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build --chown=node:node /app/apps/backend/package.json ./apps/backend/
 COPY --from=build --chown=node:node /app/apps/backend/dist ./apps/backend/dist
-COPY --from=build --chown=node:node /app/services/anchor-worker/package.json ./services/anchor-worker/
-COPY --from=build --chown=node:node /app/services/anchor-worker/dist ./services/anchor-worker/dist
 
 # Never root: a container that can only read its own code cannot be used to
 # rewrite it if the process is compromised.

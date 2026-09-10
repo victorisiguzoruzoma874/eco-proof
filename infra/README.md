@@ -71,7 +71,6 @@ domain):
 | `DASHBOARD_HOST` | `dashboard.proofchain.example` | Same, for operators |
 | `ACME_EMAIL` | `ops@proofchain.example` | Certificate expiry notices |
 | `JWT_SECRET` | — | Operator session signing |
-| `STELLAR_SECRET` | — | The anchoring account |
 
 Both hostnames must resolve to this host in public DNS **before** first start, or
 the ACME challenge fails.

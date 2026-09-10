@@ -1,9 +1,7 @@
-# Render blueprint: the API and the anchor worker.
+# Render blueprint: the API.
 #
 # Apply it from the Render dashboard (Blueprints → New Blueprint Instance) after
-# pointing it at this repository. Both services build the SAME Dockerfile and
-# differ only in the command they run, so the backend and the worker can never
-# drift apart on how a Merkle leaf is hashed.
+# pointing it at this repository.
 #
 # Postgres is deliberately NOT declared here: the database is on Neon, which
 # keeps the evidentiary record independent of this platform account and gives
@@ -50,55 +48,7 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      # Must match the worker's value below — Render cannot generate it in two
-      # places and have them agree, so it is entered once for each service.
-      - key: ANCHOR_WORKER_TOKEN
-        sync: false
       # The dashboard and capture origins. Production honours this allowlist
       # alone; the development loopback fallback is off.
       - key: CORS_ORIGINS
         sync: false
-
-  # -------------------------------------------------------------------------
-  # Anchor worker
-  # -------------------------------------------------------------------------
-  # A background worker, not a cron job: it polls for sealed-but-unanchored
-  # batches and recovers from a crash by simply asking again. Keep it at a
-  # single instance — two workers would both try to anchor the same batch, and
-  # while the backend rejects the second write-back, the duplicate Stellar
-  # transaction has already cost a fee by then.
-  - type: worker
-    name: proofchain-anchor-worker
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    dockerCommand: node services/anchor-worker/dist/index.js
-    plan: starter
-    region: frankfurt
-
-    envVars:
-      - key: NODE_ENV
-        value: production
-      # The API's own https:// URL. `hostport` would be the tidier, private
-      # option, but it renders as "host:port" with no scheme and the worker
-      # builds request URLs by string concatenation — it would fail to parse
-      # before it ever reached the network. The traffic is TLS either way, and
-      # the anchor write-back carries its own token.
-      - key: BACKEND_URL
-        fromService:
-          type: web
-          name: proofchain-api
-          property: url
-      # The credential for POST /batches/:id/anchor. Set it to the SAME value
-      # as the API's ANCHOR_WORKER_TOKEN above: a mismatch means every anchor
-      # write-back is rejected with a 401 and batches silently stay unanchored.
-      - key: ANCHOR_WORKER_TOKEN
-        sync: false
-      # The ed25519 secret of the funded testnet account that pays the fee and
-      # signs the anchor transaction. Rotate it if it is ever exposed.
-      - key: STELLAR_SECRET
-        sync: false
-      - key: STELLAR_HORIZON_URL
-        value: https://horizon-testnet.stellar.org
-      - key: STELLAR_NETWORK_PASSPHRASE
-        value: "Test SDF Network ; September 2015"

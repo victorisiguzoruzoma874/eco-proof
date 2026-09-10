@@ -2,14 +2,13 @@
   "name": "proofchain",
   "private": true,
   "version": "0.1.0",
-  "description": "Verified waste-to-credit platform on Stellar (testnet phase)",
+  "description": "Verified waste-to-credit platform with hub re-weigh and payout tracking",
   "workspaces": [
     "packages/*",
     "apps/backend",
     "apps/dashboard",
     "apps/capture",
-    "apps/mobile",
-    "services/*"
+    "apps/mobile"
   ],
   "engines": {
     "node": ">=20.11"
@@ -22,14 +21,13 @@
     "db:up": "docker compose -f infra/docker-compose.yml up -d postgres redis",
     "db:down": "docker compose -f infra/docker-compose.yml down",
     "stack:up": "docker compose -f infra/docker-compose.yml up -d",
-    "stellar:account": "node services/anchor-worker/scripts/create-testnet-account.mjs",
     "migrate": "npm run migration:run -w @proofchain/backend",
     "seed": "npm run seed -w @proofchain/backend",
     "dev:backend": "npm run start:dev -w @proofchain/backend",
+    "dev:backend:inmemory": "npm run start:inmemory -w @proofchain/backend",
     "dev:dashboard": "npm run dev -w @proofchain/dashboard",
     "dev:capture": "npm run dev -w @proofchain/capture",
     "dev:mobile": "npm run start -w @proofchain/mobile",
-    "worker": "npm run start -w @proofchain/anchor-worker",
     "demo": "node scripts/demo-e2e.mjs",
     "e2e:dashboard": "node e2e/dashboard.mjs",
     "e2e:capture": "node e2e/capture.mjs",

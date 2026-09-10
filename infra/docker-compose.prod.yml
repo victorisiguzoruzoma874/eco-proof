@@ -78,28 +78,6 @@ services:
       # allowlist to name the real hosts.
       CORS_ORIGINS: https://${CAPTURE_HOST},https://${DASHBOARD_HOST}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
-      STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  # -------------------------------------------------------------------------
-  # Anchor worker — same image, different entrypoint.
-  # -------------------------------------------------------------------------
-  worker:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    command: ["node", "services/anchor-worker/dist/index.js"]
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL:-postgres://proofchain:proofchain@postgres:5432/proofchain}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-      STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
-      STELLAR_SECRET: ${STELLAR_SECRET:?set STELLAR_SECRET for the anchoring account}
     depends_on:
       postgres:
         condition: service_healthy

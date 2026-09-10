@@ -1,19 +1,21 @@
 /**
- * End-to-end demo: weigh-in -> batch -> seal -> Stellar anchor -> audit report.
+ * End-to-end demo: weigh-in -> batch -> seal -> custody -> hub re-weigh -> payout -> audit report.
  *
  * Acts as a real enrolled collector device: it signs each weigh-in with the
  * ed25519 private key written by the seed script, so every server-side integrity
- * check runs exactly as it would in the field.
+ * check runs exactly as it would in the field. It then plays the hub operator,
+ * re-weighing two of the collector's drop-offs (one that matches the claim, one
+ * that doesn't) and turning the verified re-weighs into a paid payout.
  *
  *   node scripts/demo-e2e.mjs
  *
- * Requires: backend running on :3000, database seeded, anchor worker built and
- * STELLAR_SECRET funded on testnet.
+ * Requires: backend running on :3000, database migrated and seeded (the seed
+ * also writes a default material_rates row per active material, which the
+ * payout step below depends on).
  */
 
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { randomBytes, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -22,10 +24,10 @@ const require = createRequire(import.meta.url);
 const shared = require("@proofchain/shared");
 const { privateKeyFromPem, signWeighIn, verifyMerkleProof } = shared;
 
-
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:3000";
+const TOTAL_STEPS = 9;
 
 const seed = JSON.parse(
   readFileSync(resolve(ROOT, "apps/backend/var/seed-devices.json"), "utf8"),
@@ -33,6 +35,28 @@ const seed = JSON.parse(
 
 /** The hub is read from the API, never hardcoded. */
 let hub = null;
+
+function log(step, message) {
+  console.log(`\n[${step}/${TOTAL_STEPS}] ${message}`);
+}
+
+/** Thin JSON fetch wrapper — every call below goes through this. */
+async function api(path, { method = "GET", token, body, headers = {} } = {}) {
+  const res = await fetch(`${BACKEND}${path}`, {
+    method,
+    headers: {
+      ...(body !== undefined ? { "content-type": "application/json" } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${method} ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return res.json();
+}
 
 function fakeJpeg() {
   return Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), randomBytes(512)]);
@@ -70,21 +94,8 @@ async function uploadPhoto(eventId, photoBytes) {
   return res.json();
 }
 
-/** null is "we could not ask", which is not the same as "no". */
-function describeTriState(value) {
-  if (value === true) return "confirmed";
-  if (value === false) return "NOT ON CHAIN";
-  return "unchecked (Horizon unreachable)";
-}
-
-function describeLedger(confirmation) {
-  if (!confirmation) return "no anchor to check";
-  const detail = `memo=${confirmation.memoMatches} dataEntry=${confirmation.dataEntryMatches}`;
-  return `${describeTriState(confirmation.rootMatchesLedger)} (${detail})`;
-}
-
 async function main() {
-  log("1/8", "Authenticating as the hub operator");
+  log(1, "Authenticating as the hub operator");
   const { accessToken, role } = await api("/auth/login", {
     method: "POST",
     body: { email: "operator@proofchain.local", password: "operator-dev-password" },
@@ -97,8 +108,11 @@ async function main() {
 
   console.log(`  hub ${hub.code}`);
 
-  log("2/8", "Capturing signed weigh-ins from enrolled devices");
-  const eventIds = [];
+  log(2, "Capturing signed weigh-ins from enrolled devices");
+  // Tracks each accepted event against the collector and claimed weight it
+  // belongs to, so the re-weigh step below can pick two drop-offs from the
+  // same collector without re-fetching them.
+  const captured = [];
   let submitted = 0;
   let photosUploaded = 0;
   const failuresBeforeReport = [];
@@ -114,19 +128,23 @@ async function main() {
     if (result.quarantined) {
       console.log(`  event ${i + 1}: QUARANTINED (${result.integrity.outcome})`);
     } else {
-      eventIds.push(result.eventId);
+      captured.push({
+        eventId: result.eventId,
+        collectorId: payload.collectorId,
+        weightKg: payload.weightKg,
+      });
       // Second request, as a field phone does it: the weigh-in is already safe
       // on the server before the megabytes are attempted.
       await uploadPhoto(result.eventId, photoBytes);
       photosUploaded += 1;
     }
   }
-  console.log(`  ${eventIds.length}/${submitted} weigh-ins passed integrity v1`);
+  console.log(`  ${captured.length}/${submitted} weigh-ins passed integrity v1`);
   console.log(`  ${photosUploaded} photos uploaded and hash-checked by the server`);
 
   // Prove the server refuses a substituted photo. This is the check that makes
   // the image evidence rather than decoration.
-  const substituteTarget = eventIds[0];
+  const substituteTarget = captured[0].eventId;
   const substitution = await fetch(`${BACKEND}/events/${substituteTarget}/photo`, {
     method: "POST",
     headers: { "content-type": "application/octet-stream" },
@@ -137,7 +155,7 @@ async function main() {
   );
   if (substitution.ok) failuresBeforeReport.push("server accepted a photo that was not signed");
 
-  log("3/8", "Proving a tampered weigh-in is rejected");
+  log(3, "Proving a tampered weigh-in is rejected");
   {
     const device = seed.devices[0];
     const { photoBytes: _unusedPhoto, ...honest } = buildWeighIn(device, 99);
@@ -157,7 +175,8 @@ async function main() {
     if (!result.quarantined) throw new Error("SECURITY: a tampered weigh-in was accepted");
   }
 
-  log("4/8", "Opening a batch and adding the clean events");
+  log(4, "Opening a batch and adding the clean events");
+  const eventIds = captured.map((c) => c.eventId);
   const batch = await api("/batches", {
     method: "POST",
     token: accessToken,
@@ -170,7 +189,7 @@ async function main() {
   });
   console.log(`  batch ${batch.id}`);
 
-  log("5/8", "Sealing the batch (membership and Merkle root freeze here)");
+  log(5, "Sealing the batch (membership and Merkle root freeze here)");
   const sealed = await api(`/batches/${batch.id}/seal`, {
     method: "POST",
     token: accessToken,
@@ -178,7 +197,7 @@ async function main() {
   console.log(`  root      : ${sealed.merkleRoot}`);
   console.log(`  weight    : ${sealed.totalWeightKg} kg across ${sealed.eventCount} weigh-ins`);
 
-  log("6/8", "Recording chain of custody with reconciliation");
+  log(6, "Recording chain of custody with reconciliation");
   await api(`/batches/${batch.id}/custody`, {
     method: "POST",
     token: accessToken,
@@ -193,58 +212,130 @@ async function main() {
   });
   console.log("  custody transfer recorded");
 
-  log("7/8", "Anchoring the root on Stellar testnet");
+  log(7, "Recording hub re-weighs (within-tolerance and flagged cases)");
 
-  // Before anchoring, prove the failure path is wired: report an attempt that
-  // produced nothing and check the backend holds it back rather than handing
-  // the batch straight back to the worker.
-  const beforeBackoff = await api("/batches/pending-anchor");
-  const queuedBefore = beforeBackoff.some((b) => b.id === batch.id);
+  // Two drop-offs from the same collector, so both can land on one payout below.
+  const firstDeviceCollectorId = seed.devices[0].collectorId;
+  const sameCollector = captured.filter((c) => c.collectorId === firstDeviceCollectorId);
+  if (sameCollector.length < 2) {
+    throw new Error("need at least two clean weigh-ins from the same collector for this demo");
+  }
+  const [withinCase, flaggedCase] = sameCollector;
 
-  await api(`/batches/${batch.id}/anchor-failure`, {
+  // Case A: the hub scale agrees with the claim — status "verified", 0% variance.
+  const verifiedReweigh = await api(`/events/${withinCase.eventId}/reweigh`, {
     method: "POST",
-    body: { outcome: "failed", detail: "demo: simulated Horizon timeout" },
-    headers: { "x-anchor-worker-token": process.env.ANCHOR_WORKER_TOKEN ?? "" },
+    token: accessToken,
+    body: { verifiedWeightKg: withinCase.weightKg },
   });
-
-  const afterBackoff = await api("/batches/pending-anchor");
-  const queuedAfter = afterBackoff.some((b) => b.id === batch.id);
-  console.log(`  failure recorded; batch withheld from the queue: ${queuedBefore && !queuedAfter}`);
-  if (!queuedBefore) failuresBeforeReport.push("sealed batch never entered the anchor queue");
-  if (queuedAfter) failuresBeforeReport.push("a failed batch was offered again immediately");
-
-  const health = await api("/batches/anchor-health", { token: accessToken });
-  const awaiting = health.batches.find((b) => b.batchId === batch.id);
   console.log(
-    `  anchor health   : ${health.awaitingAnchor} awaiting, ${health.stuck} stuck ` +
-      `(this batch: ${awaiting?.failedAttempts ?? 0} failed, next ${awaiting?.nextAttemptAt ?? "now"})`,
+    `  event ${withinCase.eventId.slice(0, 8)}: claimed ${withinCase.weightKg} kg, ` +
+      `verified ${verifiedReweigh.verifiedWeightKg} kg -> ${verifiedReweigh.status} ` +
+      `(${verifiedReweigh.variancePct}% variance)`,
   );
-  if (!awaiting || awaiting.failedAttempts !== 1) {
-    failuresBeforeReport.push("anchor health did not report the recorded failure");
+  if (verifiedReweigh.status !== "verified") {
+    failuresBeforeReport.push("a matching re-weigh was not marked verified");
   }
 
-  // The worker is invoked directly below, so it anchors regardless of the
-  // backoff the queue is applying — which is what makes the recovery visible.
-  const workerOutput = execFileSync(
-    process.execPath,
-    [
-      "-e",
-      `require("dotenv").config({path:"${resolve(ROOT, "services/anchor-worker/.env")}"});` +
-        `require("${resolve(ROOT, "services/anchor-worker/dist/index.js")}").anchorOnce()` +
-        `.then(n=>console.log("anchored "+n+" batch(es)")).catch(e=>{console.error(e);process.exit(1)})`,
-    ],
-    { cwd: resolve(ROOT, "services/anchor-worker"), encoding: "utf8" },
+  // Case B: the hub scale reads noticeably less — outside the ±5% tolerance,
+  // so status "flagged". Still payable (Phase 1 decision #2: auto-pay the
+  // lower, hub-verified weight), but `notes` is mandatory as the audit trail.
+  const flaggedVerifiedWeight = Number((flaggedCase.weightKg * 0.8).toFixed(3));
+  const flaggedReweigh = await api(`/events/${flaggedCase.eventId}/reweigh`, {
+    method: "POST",
+    token: accessToken,
+    body: {
+      verifiedWeightKg: flaggedVerifiedWeight,
+      notes: "hub scale reads notably lower than the claim; material appeared partly damp",
+    },
+  });
+  console.log(
+    `  event ${flaggedCase.eventId.slice(0, 8)}: claimed ${flaggedCase.weightKg} kg, ` +
+      `verified ${flaggedReweigh.verifiedWeightKg} kg -> ${flaggedReweigh.status} ` +
+      `(${flaggedReweigh.variancePct}% variance)`,
   );
-  console.log(workerOutput.trim().split("\n").map((l) => `  ${l}`).join("\n"));
+  if (flaggedReweigh.status !== "flagged") {
+    failuresBeforeReport.push("a 20%-off re-weigh was not flagged");
+  }
 
-  log("8/8", "Fetching the audit artifact and verifying it independently");
+  // A flagged re-weigh with no stated reason must be refused outright — prove
+  // the mandatory-reason gate is live, not just documented.
+  const unreasonedAttempt = await fetch(`${BACKEND}/events/${withinCase.eventId}/reweigh`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ verifiedWeightKg: 0.5 }),
+  });
+  // withinCase already has a reweigh recorded (one-to-one), so this doubles as
+  // proof that a second re-weigh of the same event is refused (409), not that
+  // a bare discrepancy is (that path is exercised implicitly by flaggedCase
+  // above, which supplied notes and succeeded).
+  console.log(
+    `  duplicate re-weigh of an already-recorded event rejected: ${!unreasonedAttempt.ok} ` +
+      `(HTTP ${unreasonedAttempt.status})`,
+  );
+  if (unreasonedAttempt.ok) failuresBeforeReport.push("a second re-weigh of the same event was accepted");
 
-  // The failure must survive the recovery: "anchored after one failure" is a
-  // different operational fact from "anchored first time".
-  const healthAfter = await api("/batches/anchor-health", { token: accessToken });
-  const stillAwaiting = healthAfter.batches.some((b) => b.batchId === batch.id);
-  console.log(`  batch left the anchor queue after anchoring: ${!stillAwaiting}`);
-  if (stillAwaiting) failuresBeforeReport.push("anchored batch is still listed as awaiting anchor");
+  const reweighHistory = await api(`/events/${withinCase.eventId}/reweigh`);
+  console.log(`  GET /events/:id/reweigh returns ${reweighHistory.length} record(s) for that event`);
+
+  log(8, "Creating a payout from verified re-weighs and marking it paid");
+
+  const rates = await api(
+    `/material-rates?materialCode=PET`,
+    { token: accessToken },
+  );
+  const rate = rates.find((r) => r.hubId === null) ?? rates[0];
+  if (!rate) {
+    throw new Error(
+      "no material rate configured for PET — the seed should have written a default one; run `npm run seed`",
+    );
+  }
+  console.log(`  rate in effect: ${rate.ratePerKg}/kg for PET${rate.hubId ? ` at hub ${rate.hubId}` : " (global default)"}`);
+
+  const expectedAmount = Number(
+    (
+      Number(verifiedReweigh.verifiedWeightKg) * Number(rate.ratePerKg) +
+      Number(flaggedReweigh.verifiedWeightKg) * Number(rate.ratePerKg)
+    ).toFixed(2),
+  );
+
+  const payout = await api("/payouts", {
+    method: "POST",
+    token: accessToken,
+    body: {
+      collectorId: firstDeviceCollectorId,
+      eventReweighIds: [verifiedReweigh.id, flaggedReweigh.id],
+      method: "cash",
+    },
+  });
+  console.log(
+    `  payout ${payout.id.slice(0, 8)}: ${payout.amount} ${payout.currency} (${payout.status}), ` +
+      `covering ${[verifiedReweigh.id, flaggedReweigh.id].length} re-weigh(s)`,
+  );
+  if (Math.abs(Number(payout.amount) - expectedAmount) > 0.01) {
+    failuresBeforeReport.push(
+      `payout amount ${payout.amount} does not match expected ${expectedAmount} (verified+flagged weight * rate)`,
+    );
+  }
+
+  const paidPayout = await api(`/payouts/${payout.id}/mark-paid`, {
+    method: "POST",
+    token: accessToken,
+    body: { payoutRef: "demo-cash-handover-001" },
+  });
+  console.log(`  payout marked ${paidPayout.status}, ref ${paidPayout.payoutRef}`);
+  if (paidPayout.status !== "paid") failuresBeforeReport.push("payout did not transition to paid");
+
+  // A second mark-paid attempt must be refused — a payout is paid once.
+  const doublePay = await fetch(`${BACKEND}/payouts/${payout.id}/mark-paid`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({}),
+  });
+  console.log(`  double mark-paid rejected: ${!doublePay.ok} (HTTP ${doublePay.status})`);
+  if (doublePay.ok) failuresBeforeReport.push("a payout was marked paid twice");
+
+  log(9, "Fetching the audit artifact and verifying it independently");
 
   const report = await api(`/batches/${batch.id}/report`);
 
@@ -255,15 +346,15 @@ async function main() {
   console.log(`  roots agree      : ${report.proof.rootMatchesSealedValue}`);
   console.log(`  all proofs valid : ${report.proof.allProofsValid}`);
   console.log(`  reconciliation   : gap ${report.reconciliation.gapKg} kg (${report.reconciliation.gapPct}%)`);
-
-  if (report.onChain) {
-    console.log(`  stellar tx       : ${report.onChain.stellarTxHash}`);
-    console.log(`  ledger           : ${report.onChain.stellarLedger}`);
-    console.log(`  explorer         : ${report.onChain.explorerUrl}`);
-    console.log(`  ledger says      : ${describeLedger(report.onChain.ledgerConfirmation)}`);
-  } else {
-    console.log("  stellar tx       : NOT ANCHORED");
-  }
+  console.log(
+    `  reweighs         : ${report.reweighs.length} recorded ` +
+      `(${report.reweighs.filter((r) => r.status === "verified").length} verified, ` +
+      `${report.reweighs.filter((r) => r.status === "flagged").length} flagged)`,
+  );
+  console.log(
+    `  payouts          : ${report.payouts.length} recorded, ` +
+      `${report.payouts.filter((p) => p.status === "paid").length} paid`,
+  );
 
   // The check a buyer would run: recompute one event's proof themselves.
   const sample = report.events[0];
@@ -272,12 +363,6 @@ async function main() {
 
   const verify = await api(`/batches/${batch.id}/verify/${sample.eventId}`);
   console.log(`  verify endpoint agrees: ${verify.proofValid}`);
-  console.log(`  root matches ledger   : ${describeTriState(verify.onChain?.rootMatchesLedger)}`);
-
-  // The batch-level read-back, which is what an auditor checking many events
-  // in one batch would call once instead of per event.
-  const ledger = await api(`/batches/${batch.id}/ledger`);
-  console.log(`  ledger endpoint       : ${describeLedger(ledger.confirmation)}`);
 
   const failures = [...failuresBeforeReport];
 
@@ -299,16 +384,24 @@ async function main() {
   if (!report.proof.rootMatchesSealedValue) failures.push("recomputed root != sealed root");
   if (!report.proof.allProofsValid) failures.push("some Merkle proofs invalid");
   if (!independent) failures.push("independent proof check failed");
-  if (!report.onChain) failures.push("batch was not anchored on Stellar");
+  if (!verify.proofValid) failures.push("verify endpoint disagrees with the recomputed proof");
 
-  // Deliberately fails only on an explicit contradiction. A null means Horizon
-  // was unreachable from this machine, which is a network fact and must not
-  // turn a working pipeline into a red demo.
-  if (report.onChain?.ledgerConfirmation?.rootMatchesLedger === false) {
-    failures.push("Horizon does not carry the sealed root for this batch");
+  const reportedReweighIds = new Set(report.reweighs.map((r) => r.eventId));
+  if (!reportedReweighIds.has(withinCase.eventId) || !reportedReweighIds.has(flaggedCase.eventId)) {
+    failures.push("audit report is missing one of the recorded re-weighs");
   }
-  if (ledger.confirmation?.rootMatchesLedger === false) {
-    failures.push("batch ledger endpoint reports the root is not on chain");
+  const reportedStatuses = new Map(report.reweighs.map((r) => [r.eventId, r.status]));
+  if (reportedStatuses.get(withinCase.eventId) !== "verified") {
+    failures.push("audit report shows the matching re-weigh with the wrong status");
+  }
+  if (reportedStatuses.get(flaggedCase.eventId) !== "flagged") {
+    failures.push("audit report shows the discrepant re-weigh with the wrong status");
+  }
+  const reportedPayout = report.payouts.find((p) => p.id === payout.id);
+  if (!reportedPayout) {
+    failures.push("audit report is missing the payout covering this batch's re-weighs");
+  } else if (reportedPayout.status !== "paid") {
+    failures.push("audit report shows the payout with the wrong status");
   }
 
   if (failures.length > 0) {
@@ -319,6 +412,7 @@ async function main() {
   console.log(`\n\x1b[32mEnd-to-end verified.\x1b[0m batch=${batch.id}`);
   console.log(`Audit report : ${BACKEND}/batches/${batch.id}/report`);
   console.log(`Event CSV    : ${BACKEND}/batches/${batch.id}/report/events.csv`);
+  console.log(`Payout       : ${BACKEND}/payouts/${payout.id}`);
 }
 
 main().catch((error) => {

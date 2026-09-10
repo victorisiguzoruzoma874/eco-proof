@@ -3,16 +3,16 @@
 **Technical design and data model for ProofChain.**
 
 This document describes:
-1. The database schema (9 tables)
+1. The database schema (12 tables)
 2. The integrity v1 checks and threat model
-3. Why classic Stellar and not Soroban
+3. Why re-weigh-based verification, not a blockchain anchor
 4. Known limitations and future work
 
 ## Data Model
 
 The schema is designed backwards from the audit artifact. Every table exists because an auditor, a PRO, or a credit buyer will eventually ask about it.
 
-### The 9 Tables
+### The 12 Tables
 
 #### 1. Hubs (collection_points)
 
@@ -156,25 +156,48 @@ CREATE TABLE custody_transfers (
 
 **Why it matters:** Documents the physical journey of the waste. Variance is expected but auditable. Stored (not computed) so a later change to weights is visible.
 
-#### 7. Anchor Records (on_chain_proofs)
+#### 7. Event Reweighs (event_reweighs)
 
-Links each batch to its Stellar transaction. One per batch (1:1 relationship).
+The hub's independent re-measurement of a collector's claimed weight — the
+check that turns a self-reported drop-off into something payable. One per
+event (1:1, enforced by a unique index on `eventId`): a second re-weigh of the
+same event is a data-entry mistake to correct out of band, not a revision to
+record.
+
+Deliberately a separate table, not columns added to `collection_events`: the
+event's signed/hashed columns feed the Merkle leaf and are treated as
+immutable once ingested, so a re-weigh — captured later, by hub staff, never
+signed by the device — has to live elsewhere. `claimedWeightKg` is copied from
+the event at reweigh time rather than joined live, so a report row stays a
+self-contained audit fact on its own. `varianceKg`/`variancePct` are stored,
+not derived, mirroring `custody_transfers`' convention: a later change to
+either weight must not silently change the recorded variance.
 
 ```sql
-CREATE TABLE anchor_records (
+CREATE TABLE event_reweighs (
   id uuid PRIMARY KEY,
-  batchId uuid UNIQUE REFERENCES batches,  -- One anchor per batch
-  merkleRoot varchar,
-  stellarTxHash varchar UNIQUE,  -- Immutable ledger reference
-  stellarLedger bigint,          -- Ledger sequence number
-  network varchar DEFAULT 'testnet',  -- testnet | public
-  dataEntryKey varchar,          -- "proofchain:batch:<batch_id>"
-  anchoredAt timestamptz,        -- When the transaction was submitted
+  eventId uuid UNIQUE REFERENCES collection_events ON DELETE RESTRICT,
+  claimedWeightKg numeric(10,3),   -- copied from the event at reweigh time
+  verifiedWeightKg numeric(10,3),  -- what the hub scale read
+  varianceKg numeric(10,3),        -- claimed - verified, stored not derived
+  variancePct numeric(6,3),
+  status varchar,                  -- verified | flagged | rejected
+  notes varchar NULL,              -- required when status = flagged/rejected
+  verifiedByUserId uuid REFERENCES users,
+  verifiedAt timestamptz,
   createdAt timestamptz
 );
 ```
 
-**Why it matters:** The proof that the batch was sealed at a specific time and immutably recorded. `stellarLedger` is immutable; `stellarTxHash` is a permanent reference.
+**Why it matters:** This is the independent, physical check the whole
+workflow is built around — see [Why re-weigh-based verification](#why-re-weigh-based-verification-not-a-blockchain-anchor)
+below. `status` is set by a fixed ±5% tolerance check at write time:
+within tolerance is `verified`; outside it is `flagged`, and `notes` becomes
+mandatory as the audit trail for why the numbers diverge. **Both statuses are
+payable** — nothing here auto-rejects a submission or blocks payment; the
+collector is paid the hub-verified (lower) weight either way. `rejected` is
+not set by this automated logic; it exists on the column only for a possible
+future manual-override workflow, and nothing in this release writes it.
 
 #### 8. Users (operators_and_auditors)
 
@@ -214,14 +237,17 @@ CREATE TABLE materials (
 ```
 
 **Why it matters, and why it is shaped like this:** `material` is a field in the
-signed weigh-in payload, so a code is hashed into the Merkle leaf and anchored on
-the ledger. Three consequences follow, and every design decision here is one of
+signed weigh-in payload, so a code is hashed into the Merkle leaf of every
+batch containing it, and it is also the join key a `material_rates` row prices
+against. Three consequences follow, and every design decision here is one of
 them:
 
-1. **Codes are append-only.** There is no rename endpoint. Renaming a code that
-   has been anchored would invalidate the audit report of every batch containing
-   it, and no migration can fix that — the root is on a public ledger. The code is
-   the primary key partly to make this structural.
+1. **Codes are append-only.** There is no rename endpoint. Renaming a code
+   already used by a sealed batch would invalidate that batch's audit report —
+   its stored `merkleRoot` would no longer match a root recomputed from the
+   (now-renamed) event list — and no migration can retroactively fix a report
+   already handed to an auditor or buyer. The code is the primary key partly
+   to make this structural.
 2. **Retiring is not deleting.** `active: false` removes a material from the
    capture pickers and touches no stored event. Outright deletion is allowed only
    for a code no event and no batch has ever used; anything else returns 409 with
@@ -229,8 +255,8 @@ them:
 3. **No foreign key from `collection_events.material` or `batches.material`.**
    This is deliberate. A signed material code is a historical fact, not a
    reference to current configuration, and a FK would let a catalogue edit
-   cascade into — or be blocked by — anchored evidence. Existence is checked at
-   ingest instead, where it can be reported as a 400.
+   cascade into — or be blocked by — evidence already sealed into a batch.
+   Existence is checked at ingest instead, where it can be reported as a 400.
 
 The two gates differ on purpose:
 
@@ -250,6 +276,79 @@ device reads it from a cache it may have written before the field existed.
 The six codes the pilot shipped with are seeded by the migration, and are also
 compiled into `@proofchain/shared` as `SEED_MATERIALS` — the offline fallback for
 a device that has never reached the backend.
+
+#### 10. Payouts (payouts)
+
+One payment run to a collector, covering one or more of their verified/flagged
+re-weighs. Payout destination stays manual/cash for now (Phase 1 decision #3):
+there is no structured payout-account column on `collectors`, so `method` is a
+free-text record of how this specific payout was actually handed over.
+
+```sql
+CREATE TABLE payouts (
+  id uuid PRIMARY KEY,
+  collectorId uuid REFERENCES collectors,
+  amount numeric(12,2),
+  currency varchar DEFAULT 'NGN',
+  method varchar,                -- free text: "cash" | "mobile_money" | "bank" | ...
+  payoutRef varchar NULL,        -- receipt/transfer id, set on mark-paid
+  status varchar DEFAULT 'pending',  -- pending | paid | failed
+  paidByUserId uuid NULL REFERENCES users,
+  paidAt timestamptz NULL,
+  createdAt timestamptz
+);
+```
+
+**Why it matters:** The record a collector, an auditor, or a dispute points
+to. `status` moves `pending → paid` exactly once (`payouts.service.ts`'s
+`markPaid()` refuses a payout that isn't `pending`); `paidByUserId`/`paidAt`
+are who confirmed it and when, not who created the payout request.
+
+#### 11. Payout Items (payout_items)
+
+A payout can cover several drop-offs, so this is the join row carrying the
+amount attributed to one specific re-weigh — not a duplicate of
+`payouts.amount`, which is the sum across all of a payout's items.
+
+```sql
+CREATE TABLE payout_items (
+  id uuid PRIMARY KEY,
+  payoutId uuid REFERENCES payouts ON DELETE CASCADE,
+  eventReweighId uuid REFERENCES event_reweighs ON DELETE RESTRICT,
+  amount numeric(12,2)
+);
+```
+
+**Why it matters:** This is also how "already paid" is enforced — a re-weigh
+with an existing `payout_items` row cannot be attached to a second payout
+(`payouts.service.ts`'s `create()` checks for this before writing anything).
+
+#### 12. Material Rates (material_rates)
+
+A fixed rate per kg for a material, optionally scoped to one hub. A payout
+resolves the applicable rate rather than taking a manual amount per item.
+
+```sql
+CREATE TABLE material_rates (
+  id uuid PRIMARY KEY,
+  materialCode varchar(16) REFERENCES materials,
+  hubId uuid NULL REFERENCES hubs,  -- null = global default
+  ratePerKg numeric(10,2),
+  effectiveFrom timestamptz,
+  createdAt timestamptz
+);
+```
+
+**Why it matters, and how resolution works:** `payouts.service.ts`'s
+`resolveRate()` picks the most specific `hubId` match first (falling back to
+the `hubId: null` global default), and within whichever tier applies, the
+latest `effectiveFrom` at or before now. There is no FK from
+`collection_events`/`batches` to this table, for the same reason
+`materials` has none from those tables: a rate is current pricing
+configuration, and a signed weigh-in's material must never be able to dangle
+on a rate change. If no rate resolves at all — no hub-specific and no global
+default for that material — `POST /payouts` fails with a 400 naming what was
+checked, rather than silently pricing an item at zero.
 
 ## Integrity v1 Checks
 
@@ -367,76 +466,79 @@ The overall `outcome` is:
 
 A *fail* outcome means the event is quarantined (`quarantined = true`) and will never enter a batch. Operators can view quarantined events for debugging but cannot force them into production batches.
 
-## Why Classic Stellar, Not Soroban
+## Why Re-weigh-Based Verification, Not a Blockchain Anchor
 
 ### The Problem
 
-Stellar offers two layers:
-1. **Classic** — Account-based, simple operations (`manageData`, `payment`, `setOptions`), memos, ledger finality in ~5 seconds.
-2. **Soroban** — Smart contracts, complex state management, WebAssembly, 15-second finality.
-
-Both are on the same network and use the same native token (XLM).
+A claimed weigh-in is a self-report. Signing it on-device (see Integrity v1,
+above) proves *who* made the claim and that it hasn't been altered since — it
+does nothing to prove the claim itself is true. A collector with a calibrated
+scale can still declare 20 kg for a 15 kg sack, and no signature, hash, or
+ledger entry catches that: they all faithfully preserve whatever number was
+signed. An earlier version of this project anchored each sealed batch's
+Merkle root to the Stellar testnet ledger — publishing an independently
+checkable, tamper-evident timestamp for *when* a batch's event set was frozen
+and that it hasn't changed since. That is real, but it answers the wrong
+question for the fraud this platform actually has to defend against: a
+ledger entry attests to a self-reported number being unchanged, not to that
+number being *correct*.
 
 ### The Decision
 
-ProofChain anchors the Merkle root using **classic layer only**. Here's why:
+Verification comes from an independent, physical re-measurement instead: a
+collector brings the material to a hub, staff weigh it themselves on hub
+equipment, and that reading — not the claim — is what gets paid.
 
-#### 1. Stellar Transactions Cannot Carry Memos on Soroban
+1. **A physical re-weigh is the check a spoofed claim cannot survive.**
+   Signing and hashing constrain *tampering after capture*; they cannot
+   constrain a dishonest number at the moment of capture. Only a second,
+   independent measurement can.
+2. **The tolerance/auto-pay-lower-weight policy is the fraud mitigation.** A
+   fixed ±5% band (Phase 1 decision) separates ordinary scale-to-scale
+   disagreement from a discrepancy worth flagging. Outside that band the
+   re-weigh is marked `flagged` and requires a stated reason — an audit
+   trail — but is never auto-rejected: the collector is simply paid the
+   *hub-verified* weight, which is always the number that matters for a
+   fraud incentive. Someone who claims 20 kg for 15 kg gains nothing; they
+   are paid for 15 kg either way, and the gap is on record. This makes the
+   verification self-enforcing without a manual review queue: there is no
+   reward for inflating a claim, so there is little for a review step to
+   catch that the pricing logic hasn't already made pointless.
+3. **The Merkle tree is kept, and still does real work — it just isn't
+   anchored anywhere external.** Sealing a batch still computes and freezes
+   a Merkle root over its events (`batches.service.ts`'s `seal()` is
+   unchanged by this decision), so batch membership and event order are
+   still tamper-evident within the system: a report reader still recomputes
+   the root from the event list and checks it matches, and still checks
+   individual event proofs. What changed is *where* the root's freshness is
+   attested — previously an external ledger, now the re-weigh workflow that
+   corroborates the underlying claim it commits to.
+4. **Nothing here needs a blockchain to work.** A hub re-weigh, a tolerance
+   check, and a rate-table lookup are ordinary database operations with no
+   external dependency, no funded account to maintain, and no read-back
+   against a third-party service that might be unreachable. The operational
+   cost an anchor-based design carried — funding and monitoring a
+   ledger-writing account, backing off and retrying failed submissions,
+   treating "Horizon is unreachable" as a first-class outcome throughout the
+   API — goes away entirely.
 
-A Soroban `InvokeHostFunctionOp` transaction cannot have a memo field. The memo is the transaction-level metadata that carries immutable context (in ProofChain's case, the Merkle root). Without a memo, an auditor cannot easily prove that a Stellar transaction is the one that anchored this batch.
+### What This Does Not Claim
 
-```
-// Classic: Can carry memo.hash(root)
-TransactionBuilder()
-  .addMemo(Memo.hash(root))
-  .addOperation(Operation.manageData(...))
-  .build()
+A hub re-weigh proves the *hub's* physical measurement of *some* material
+presented at the hub. It does not, by itself, prove that material is what the
+collector originally captured (a different sack could in principle be
+substituted between capture and hub visit), nor does it defend against
+collusion between a collector and hub staff. Those are threats a future
+revision could address — a chain-of-custody-style linkage between the
+captured photo and the re-weighed material, or role separation between the
+person who records a re-weigh and the person who approves a payout — neither
+of which is implemented today. See [Known Limitations](#known-limitations)
+below.
 
-// Soroban: No memo support; must encode root in contract state
-InvokeHostFunctionOp(...)
-// root must live in contract storage, not the transaction itself
-```
-
-ProofChain needs the root to be in the transaction because:
-- The transaction is the audit trail (immutable ledger record)
-- A memo is cryptographically signed as part of the tx hash
-- An auditor can verify the root without calling our APIs (query Horizon directly)
-
-#### 2. Cost and Complexity
-
-Classic `manageData` is the cheapest operation (100 stroops ≈ $0.00001 USD on testnet). Soroban operations are more expensive and require contract code to maintain registry state.
-
-For this MVP, the simpler solution is correct.
-
-#### 3. Contract Logic is Deferred to Post-Pilot
-
-The post-pilot phase will use Soroban for:
-- **Stateful credit registry** — A contract that tracks which buyers have claimed credits from which batches
-- **Double-spend prevention** — The contract holds the credits and enforces "one credit = one tonne, one claim per credit"
-- **Automated settling** — Smart contract logic to move credits between accounts
-
-For now, the classic layer proves immutability. Soroban will handle the economic layer post-pilot. The two layers complement each other.
-
-### The Implementation
-
-The anchor is written via a classic transaction with two independent proofs:
-
-1. **manageData operation** — Stores the root under the key `proofchain:batch:<batch_id>`, persists as queryable account state
-2. **Memo.hash** — Includes the root in the transaction memo, immutable as part of the ledger record
-
-Either one alone proves the anchor. Together, they survive an account's data entry being overwritten (e.g., on a future batch to the same account).
-
-```typescript
-// From services/anchor-worker/src/anchor.ts
-const tx = new TransactionBuilder(account, {
-  fee: BASE_FEE,
-  networkPassphrase: config.networkPassphrase,
-})
-  .addOperation(Operation.manageData({ name: dataEntryKey, value: root }))
-  .addMemo(Memo.hash(root))
-  .setTimeout(90)
-  .build();
-```
+`contracts/batch-registry` — a Soroban smart contract explored for a future,
+stateful credit registry — is still present in the repository. It was never
+wired to the backend and nothing imports it; it is not part of the design
+described here.
 
 ## Known Limitations
 
@@ -460,7 +562,7 @@ Integrity v1 has no per-collector quotas, anomaly detection, or historical basel
 
 Once a batch is sealed, the Merkle root is computed and frozen. Events cannot be added, removed, or reordered. If an operator realizes a weigh-in should not have been included, the batch is already committed.
 
-**Workaround:** Open a new batch and exclude the problematic event. The sealed batch remains on-chain as a historical record.
+**Workaround:** Open a new batch and exclude the problematic event. The sealed batch remains in the database as a historical record.
 
 ### 4. No Rate Limiting Per Device
 
@@ -468,24 +570,43 @@ A device can submit unlimited weigh-ins. There is no per-device quota or per-min
 
 **Mitigation:** Operator can revoke a device. Behavioral baselining will detect anomalies (e.g., 1000 weigh-ins in one day).
 
-### 5. Single-Thread Anchoring
+### 5. The Re-weigh Tolerance Is Fixed, Not Configurable
 
-The anchor worker processes one batch at a time. If sealing outpaces anchoring, batches queue in the database but are not parallelized.
+±5% applies uniformly to every material and every hub. A material genuinely
+prone to moisture loss or settling has no wider allowance; a hub with more
+precise scales gets no narrower one. A wide reading is always `flagged`, never
+auto-rejected — see [Why re-weigh-based verification](#why-re-weigh-based-verification-not-a-blockchain-anchor)
+for why that's a deliberate tradeoff rather than an oversight — but the band
+itself is a constant in `reweigh.service.ts`, not data.
 
-**Mitigation:** Upgrade to BullMQ (Redis-backed job queue) for parallel workers.
+**Mitigation:** A future revision could move the tolerance into
+`material_rates` or a dedicated per-material/per-hub settings table.
 
-### 6. Testnet Only
+### 6. No Manual-Review Gate, and No Way to Correct a Recorded Re-weigh
 
-The pilot runs on Stellar testnet. Public network requires:
-- Security audit of the signing contract and integrity checks
-- Stellar public network account setup and funding
-- Verra accreditation as a carbon credit issuer
-- HTTPS/TLS for all endpoints
-- Production monitoring and alerting
+A flagged re-weigh is payable immediately, with no approval step — by design
+(Phase 1 decision #2). `EventReweighEntity.status` includes `"rejected"` for a
+possible future manual-override workflow, but nothing in this release sets
+it, and there is no `PATCH`/`DELETE` on `/events/:eventId/reweigh`: a
+mis-keyed verified weight is on the record permanently once submitted (the
+one-re-weigh-per-event uniqueness constraint prevents a second, corrective
+attempt on the same event).
 
-### 7. Stellar Ledger Finality
+**Mitigation:** A future revision could add an admin-only correction endpoint
+that writes a new row (never edits the original) and marks the superseded one
+`rejected`, preserving both readings in the audit trail.
 
-Stellar has 3–5 second average finality. In rare cases (cosmic radiation bit flips, protocol upgrades), a ledger can be rolled back. For carbon credits, this is acceptable (immutability is best-effort, not cryptographic certainty like Bitcoin).
+### 7. Payout Destination Is Manual/Cash Only
+
+`PayoutEntity.method` is free text ("cash", "mobile money", …), not a
+validated or integrated payment rail, and there is no structured
+payout-account field on `CollectorEntity` (Phase 1 decision #3 dropped this
+from scope). Reconciling that a payout was actually received happens outside
+the system.
+
+**Mitigation:** A future revision could add a validated payout-destination
+field on the collector record and integrate a mobile-money API for disbursal
+and confirmation.
 
 ## Future Enhancements
 
@@ -496,23 +617,21 @@ Stellar has 3–5 second average finality. In rare cases (cosmic radiation bit f
 - **Tamper-evident hardware** — Integration with certified scales (Bluetooth API)
 - **Volume estimation** — Reject weight claims that are implausible for the reported volume
 
-### Soroban Credit Registry (Post-Pilot)
+### Re-weigh and Payout
 
-- **Stateful credit contract** — Tracks batch → credits mapping
-- **Double-spend prevention** — Each credit can be claimed once
-- **Automated settling** — Move credits from issuer to buyers
-- **Custody history** — On-chain audit trail of credit movement
+- **Configurable tolerance** — Per-material or per-hub bands instead of one fixed ±5%
+- **Correction workflow** — A supersede-and-preserve edit path for a mis-recorded re-weigh, instead of the current write-once record
+- **Structured payout destinations** — A validated payout-account field on the collector record, and integration with a mobile-money disbursal API
+- **Chain-of-custody linkage** — Tying the hub-verified material back to the captured photo, to narrow the substitution gap noted above
 
 ### Infrastructure
 
-- **Parallel anchoring** — BullMQ job queue for concurrent batch anchoring
 - **Batch pagination** — Optimize large audit reports (current cap: 10,000 events)
 - **Photo storage** — IPFS or S3 backend for photo persistence
 - **Operator analytics** — Dashboard metrics (collection rate, recycling rate, buyer engagement)
 
 ## References
 
-- **Stellar Documentation** — https://developers.stellar.org
 - **Merkle Trees** — https://en.wikipedia.org/wiki/Merkle_tree
 - **Ed25519 Signing** — https://tools.ietf.org/html/rfc8032
 - **Verifiable Carbon Offsets** — https://verra.org/project/verified-carbon-standard/

@@ -105,7 +105,7 @@ const report = await page.locator("body").innerText();
 check("report renders", /report|verification/i.test(report));
 check("shows the sealed root", /[0-9a-f]{64}/.test(report));
 check("states roots agree", /roots agree/i.test(report));
-check("links the Stellar transaction", (await page.locator('a[href*="stellar.expert"]').count()) > 0);
+check("shows reweigh or payout status", /reweigh|payout/i.test(report));
 
 // ---------------------------------------------------------------- 8. bad batch id
 console.log("\n[8] Unknown batch gives a specific error, not a crash");

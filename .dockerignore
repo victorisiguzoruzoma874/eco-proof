@@ -1,7 +1,7 @@
 # Keeping these out of the build context is not only about speed: `var/`
-# holds seeded device PRIVATE keys and `.env` holds the Stellar secret and JWT
-# signing key. Copying either into an image would put them in every layer that
-# image is ever pushed to.
+# holds seeded device PRIVATE keys and `.env` holds the JWT signing key.
+# Copying either into an image would put them in every layer that image is
+# ever pushed to.
 .env
 .env.*
 !.env.example
