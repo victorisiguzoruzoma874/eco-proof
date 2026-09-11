@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3002",
-    "prebuild": "npm run build -w @proofchain/shared",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 3002",
     "typecheck": "tsc --noEmit",
