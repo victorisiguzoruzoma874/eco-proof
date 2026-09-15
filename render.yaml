@@ -24,8 +24,13 @@ services:
   - type: web
     name: proofchain-api
     runtime: node
+    # NODE_ENV=production is set below for the running service, but it also
+    # reaches the build step, where npm reads it as an implicit --omit=dev —
+    # `nest build` and `tsc` are devDependencies, so `npm ci` would otherwise
+    # skip installing them. --include=dev overrides that; `npm prune` at the
+    # end still strips devDependencies from what actually ships.
     buildCommand: >-
-      npm ci --fetch-retries=5 --fetch-retry-maxtimeout=60000 &&
+      npm ci --include=dev --fetch-retries=5 --fetch-retry-maxtimeout=60000 &&
       npm run build -w @proofchain/shared &&
       npm run build -w @proofchain/backend &&
       npm prune --omit=dev
