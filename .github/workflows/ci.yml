@@ -104,43 +104,6 @@ jobs:
       - name: Integration tests
         run: npm run test:integration -w @proofchain/backend
 
-  docker:
-    name: Deployment image builds
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    # The Dockerfile is the deployment artifact for the API. Nothing else in CI
-    # exercises it, so without this job it rots quietly and the breakage
-    # surfaces during a deploy — the worst moment to discover that a workspace
-    # manifest was added and `npm ci` now fails.
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build the image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          load: true
-          tags: proofchain:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # An image that builds but cannot start is still a broken build, and the
-      # usual cause is a production dependency that only ever resolved because
-      # devDependencies were installed.
-      - name: API entrypoint loads
-        run: |
-          # Reaching config validation means the whole Nest graph resolved
-          # inside the pruned tree. It stops there because no env is supplied,
-          # which is the expected failure, so the exit code is not the signal.
-          docker run --rm proofchain:ci node -e "require('/app/apps/backend/dist/main.js')" \
-            > /tmp/api.log 2>&1 || true
-          grep -q "missing required environment variable" /tmp/api.log \
-            || { echo "API entrypoint failed for an unexpected reason:"; cat /tmp/api.log; exit 1; }
-
   contracts:
     name: Soroban contract (clippy, test, wasm)
     runs-on: ubuntu-latest

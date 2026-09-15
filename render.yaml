@@ -10,6 +10,12 @@
 # Secrets are declared `sync: false`, which means Render prompts for them once
 # and stores them encrypted rather than reading them out of this file. Nothing
 # in this repository should ever hold a real secret.
+#
+# Native (non-Docker) runtime: Render's own Node build image compiles the
+# workspace directly, the same way CI does. There is no Dockerfile in this
+# repository at all — the previous Debian-slim base was chosen for argon2's
+# glibc prebuilt binary, and Render's build image is glibc-based too, so that
+# binary still resolves without a source compile.
 
 services:
   # -------------------------------------------------------------------------
@@ -17,10 +23,13 @@ services:
   # -------------------------------------------------------------------------
   - type: web
     name: proofchain-api
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    dockerCommand: node apps/backend/dist/main.js
+    runtime: node
+    buildCommand: >-
+      npm ci --fetch-retries=5 --fetch-retry-maxtimeout=60000 &&
+      npm run build -w @proofchain/shared &&
+      npm run build -w @proofchain/backend &&
+      npm prune --omit=dev
+    startCommand: node apps/backend/dist/main.js
     # Free: the instance sleeps after 15 minutes idle and the next request
     # waits for it to wake.
     plan: free
@@ -39,6 +48,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Kept in step with .github/workflows/ci.yml: `npm ci` resolves the
+      # whole workspace graph, and apps/mobile (metro) requires ^20.19.4 even
+      # though this service never builds it.
+      - key: NODE_VERSION
+        value: "20.19.4"
       # Render routes through its own load balancer, so X-Forwarded-For has
       # exactly one hop worth trusting. Without this the login and ingest rate
       # limits would put every client in one bucket. See config/trust-proxy.ts.

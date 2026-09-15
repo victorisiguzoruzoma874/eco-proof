@@ -52,52 +52,23 @@ below.
 
 ## 3. Production
 
-```bash
-# Build the capture PWA — Caddy serves it from disk.
-npm run build -w @proofchain/capture
+The backend deploys to Render (see `../render.yaml`) and the capture and
+dashboard apps deploy to Vercel — both terminate TLS for you, so each app is a
+secure context on its own without any self-hosted edge in front of them.
 
-# Bring up the whole stack.
-docker compose -f infra/docker-compose.yml \
-               -f infra/docker-compose.prod.yml up -d
-```
-
-Required environment (the compose file refuses to start without them, rather
-than defaulting to a placeholder and requesting a certificate for someone else's
-domain):
-
-| Variable | Example | Why |
-|---|---|---|
-| `CAPTURE_HOST` | `collect.proofchain.example` | Hostname Caddy gets a certificate for |
-| `DASHBOARD_HOST` | `dashboard.proofchain.example` | Same, for operators |
-| `ACME_EMAIL` | `ops@proofchain.example` | Certificate expiry notices |
-| `JWT_SECRET` | — | Operator session signing |
-
-Both hostnames must resolve to this host in public DNS **before** first start, or
-the ACME challenge fails.
-
-What the stack does:
-
-- **Caddy** terminates TLS, obtains and renews certificates automatically, and
-  is the only service with published ports.
-- **Capture** is served as static files with its API at `/api` on the *same
-  origin* — no mixed content, no CORS, and a real secure context, so the camera
-  and service worker work.
-- **The dashboard** is proxied whole, because Next.js in server mode owns its own
-  routing and streaming.
-- **The backend has no published port.** Exposing `3000` would reintroduce the
-  plain-HTTP endpoint this whole arrangement exists to remove, and a phone that
-  found it would work right up until the day it silently stopped.
-- **`TRUST_PROXY=1`** because there is exactly one hop in front. Without it the
-  backend cannot see the real client IP and rate-limits every collector as a
-  single client; set higher than the true hop count and a client could forge it.
+There is no bundled reverse-proxy/TLS stack in this repository. If you're
+self-hosting on your own box instead of using those platforms, you'll need to
+terminate TLS yourself (e.g. Caddy or nginx in front of the built `dist/`
+output for capture, and reverse-proxying the backend and dashboard) — the
+`TRUST_PROXY` env var on the backend exists for exactly that case (see
+`apps/backend`'s config for how many proxy hops to trust).
 
 ### If you have no public DNS
 
 For a pilot on a closed network, [`mkcert`](https://github.com/FiloSottile/mkcert)
 issues a certificate from a local CA you install once on each phone. That gets a
 real secure context with no warning and no internet, at the cost of provisioning
-the root certificate onto every device. Caddy's `tls internal` does the same
-thing with the same caveat.
+the root certificate onto every device.
 
 ---
 

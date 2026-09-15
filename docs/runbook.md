@@ -452,8 +452,8 @@ This deploys a hosted instance operators, hub staff and auditors can reach. It
 is not a production credit issuer — see
 [Before calling it production](#before-calling-it-production).
 
-One process runs: the **API**. It's built from the `Dockerfile` at the repo
-root. `render.yaml` declares it.
+One process runs: the **API**. `render.yaml` declares it — Render builds it
+natively (`runtime: node`), no Dockerfile involved.
 
 ### 1. Database (Neon)
 
@@ -551,17 +551,21 @@ are not doing what you think.
 
 ### Running it anywhere else
 
-Nothing above is Render-specific except `render.yaml`. Any host that runs a
-container works:
+Nothing above is Render-specific except `render.yaml`. Any host that can run a
+Node process works — build and start it the same way Render's `buildCommand`
+and `startCommand` do:
 
 ```bash
-docker build -t proofchain .
-docker run -p 3000:3000 \
-  -e NODE_ENV=production -e TRUST_PROXY=1 \
-  -e DATABASE_URL='postgres://…?sslmode=require' \
-  -e JWT_SECRET=… \
-  -e CORS_ORIGINS='https://dashboard.example.com' \
-  proofchain
+npm ci
+npm run build -w @proofchain/shared
+npm run build -w @proofchain/backend
+npm prune --omit=dev
+
+NODE_ENV=production TRUST_PROXY=1 \
+  DATABASE_URL='postgres://…?sslmode=require' \
+  JWT_SECRET=… \
+  CORS_ORIGINS='https://dashboard.example.com' \
+  node apps/backend/dist/main.js
 ```
 
 ### Before calling it production
