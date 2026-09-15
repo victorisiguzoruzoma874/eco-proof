@@ -52,9 +52,10 @@ below.
 
 ## 3. Production
 
-The backend deploys to Render (see `../render.yaml`) and the capture and
-dashboard apps deploy to Vercel — both terminate TLS for you, so each app is a
-secure context on its own without any self-hosted edge in front of them.
+The backend deploys to Render (configured by hand in the Render dashboard —
+see `../docs/runbook.md`) and the capture and dashboard apps deploy to
+Vercel — both terminate TLS for you, so each app is a secure context on its
+own without any self-hosted edge in front of them.
 
 There is no bundled reverse-proxy/TLS stack in this repository. If you're
 self-hosting on your own box instead of using those platforms, you'll need to
