@@ -30,6 +30,13 @@ export interface AppConfig {
    */
   photoStorageDir: string;
   /**
+   * An S3-compatible bucket for photo bytes (R2, Supabase Storage, S3, MinIO).
+   * When set it replaces photoStorageDir: a host with an ephemeral filesystem
+   * — Render's free plan, any container without a volume — would otherwise
+   * lose every photo on restart, while the event rows kept claiming them.
+   */
+  photoS3: PhotoS3Config | null;
+  /**
    * Ceiling on a single upload. A modern phone camera produces 2-6 MB; the
    * limit exists so an unauthenticated caller cannot fill the disk one
    * request at a time.
@@ -38,10 +45,44 @@ export interface AppConfig {
   maxClockSkewSeconds: number;
 }
 
+export interface PhotoS3Config {
+  bucket: string;
+  /** Unset for AWS itself; the provider's S3 API URL for everyone else. */
+  endpoint: string | undefined;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Supabase and MinIO only answer path-style (`endpoint/bucket/key`) URLs. */
+  forcePathStyle: boolean;
+}
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`missing required environment variable: ${name}`);
   return value;
+}
+
+/**
+ * Once a bucket is named, its credentials are required rather than optional:
+ * a half-configured store would boot fine and then fail every upload.
+ */
+function loadPhotoS3Config(): PhotoS3Config | null {
+  const bucket = process.env.PHOTO_S3_BUCKET?.trim();
+  if (!bucket) return null;
+
+  const endpoint = process.env.PHOTO_S3_ENDPOINT?.trim() || undefined;
+  const pathStyle = process.env.PHOTO_S3_FORCE_PATH_STYLE?.trim().toLowerCase();
+  return {
+    bucket,
+    endpoint,
+    // R2 expects "auto"; AWS and Supabase need the bucket's real region.
+    region: process.env.PHOTO_S3_REGION?.trim() || "auto",
+    accessKeyId: required("PHOTO_S3_ACCESS_KEY_ID"),
+    secretAccessKey: required("PHOTO_S3_SECRET_ACCESS_KEY"),
+    // Every non-AWS provider accepts path-style, and not all of them accept
+    // virtual-hosted style, so a custom endpoint defaults to it.
+    forcePathStyle: pathStyle ? pathStyle === "true" : endpoint !== undefined,
+  };
 }
 
 /**
@@ -80,6 +121,7 @@ export function loadConfig(): AppConfig {
       .filter(Boolean),
     trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
     photoStorageDir: process.env.PHOTO_STORAGE_DIR ?? "./var/photos",
+    photoS3: loadPhotoS3Config(),
     maxPhotoBytes: Number(process.env.MAX_PHOTO_BYTES ?? 8 * 1024 * 1024),
     maxClockSkewSeconds: Number(process.env.MAX_CLOCK_SKEW_SECONDS ?? 900),
   };

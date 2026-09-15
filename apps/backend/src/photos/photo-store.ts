@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { Injectable, Optional } from "@nestjs/common";
 import { loadConfig } from "../config/configuration";
+import { FileBlobs, S3Blobs, type PhotoBlobs } from "./photo-blobs";
 
 /**
  * Content-addressed storage for weigh-in photo bytes.
@@ -30,14 +30,25 @@ export interface StoredPhoto {
 
 @Injectable()
 export class PhotoStore {
-  private readonly root: string;
+  private readonly blobs: PhotoBlobs;
 
   /**
-   * The root override is for tests, which write into a temp directory.
-   * `@Optional()` keeps Nest from trying to inject a String for it at boot.
+   * The override is for tests: a directory path, or any PhotoBlobs. Otherwise
+   * the configured bucket wins over the directory — see
+   * AppConfig.photoS3. `@Optional()` keeps Nest from trying to inject a value
+   * for it at boot.
    */
-  constructor(@Optional() root?: string) {
-    this.root = resolve(root ?? loadConfig().photoStorageDir);
+  constructor(@Optional() override?: string | PhotoBlobs) {
+    if (typeof override === "string") {
+      this.blobs = new FileBlobs(override);
+    } else if (override) {
+      this.blobs = override;
+    } else {
+      const config = loadConfig();
+      this.blobs = config.photoS3
+        ? S3Blobs.fromConfig(config.photoS3)
+        : new FileBlobs(config.photoStorageDir);
+    }
   }
 
   static sha256Of(bytes: Buffer): string {
@@ -49,7 +60,8 @@ export class PhotoStore {
    *
    * A single flat directory holding a pilot's worth of photos is slow to list
    * and unpleasant to back up; 256 × 256 buckets keeps any one directory small
-   * without needing a migration later.
+   * without needing a migration later. The same path is the object key when
+   * the store is a bucket.
    */
   static relativePathFor(sha256: string): string {
     if (!/^[0-9a-f]{64}$/.test(sha256)) {
@@ -58,37 +70,41 @@ export class PhotoStore {
     return join(sha256.slice(0, 2), sha256.slice(2, 4), `${sha256}.bin`);
   }
 
+  /** Only meaningful for a directory-backed store. */
   absolutePathFor(sha256: string): string {
-    return join(this.root, PhotoStore.relativePathFor(sha256));
+    if (!(this.blobs instanceof FileBlobs)) {
+      throw new Error("photos are not stored on the local filesystem");
+    }
+    return this.blobs.absolutePathFor(PhotoStore.relativePathFor(sha256));
   }
 
   /** Writes the bytes under their own digest. Safe to call repeatedly. */
   async put(bytes: Buffer): Promise<StoredPhoto> {
     const sha256 = PhotoStore.sha256Of(bytes);
     const relativePath = PhotoStore.relativePathFor(sha256);
-    const absolute = join(this.root, relativePath);
 
-    await mkdir(dirname(absolute), { recursive: true });
-    await writeFile(absolute, bytes);
+    await this.blobs.write(relativePath, bytes);
 
     return { sha256, bytes: bytes.byteLength, relativePath };
   }
 
   async read(sha256: string): Promise<Buffer | null> {
-    try {
-      return await readFile(this.absolutePathFor(sha256));
-    } catch {
-      // Absent, unreadable or a bad digest all mean the same thing to a
-      // caller: there is no photo to serve.
-      return null;
-    }
+    // A bad digest is reached from a URL parameter; its honest answer is "no
+    // such photo", not an error.
+    const relativePath = PhotoStore.pathIfValid(sha256);
+    return relativePath ? this.blobs.read(relativePath) : null;
   }
 
   async has(sha256: string): Promise<boolean> {
+    const relativePath = PhotoStore.pathIfValid(sha256);
+    return relativePath ? this.blobs.exists(relativePath) : false;
+  }
+
+  private static pathIfValid(sha256: string): string | null {
     try {
-      return (await stat(this.absolutePathFor(sha256))).isFile();
+      return PhotoStore.relativePathFor(sha256);
     } catch {
-      return false;
+      return null;
     }
   }
 }

@@ -53,3 +53,16 @@ services:
       # alone; the development loopback fallback is off.
       - key: CORS_ORIGINS
         sync: false
+      # Weigh-in photos go to an S3-compatible bucket (Cloudflare R2, Supabase
+      # Storage, S3): this instance's disk is wiped on every restart and deploy.
+      # R2's endpoint is https://<account-id>.r2.cloudflarestorage.com and its
+      # region "auto" (the default). Supabase and AWS also need PHOTO_S3_REGION
+      # set to the bucket's region. See config/configuration.ts.
+      - key: PHOTO_S3_BUCKET
+        sync: false
+      - key: PHOTO_S3_ENDPOINT
+        sync: false
+      - key: PHOTO_S3_ACCESS_KEY_ID
+        sync: false
+      - key: PHOTO_S3_SECRET_ACCESS_KEY
+        sync: false
