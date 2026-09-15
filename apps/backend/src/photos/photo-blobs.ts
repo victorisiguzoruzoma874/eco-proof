@@ -1,11 +1,6 @@
+import { createHash, createHmac } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
-import {
-  GetObjectCommand,
-  HeadObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
 import type { PhotoS3Config } from "../config/configuration";
 
 /**
@@ -66,63 +61,29 @@ export class FileBlobs implements PhotoBlobs {
  * evidence, and an outage at the provider must not be reported as that.
  */
 export class S3Blobs implements PhotoBlobs {
-  constructor(
-    private readonly client: S3Client,
-    private readonly bucket: string,
-  ) {}
+  constructor(private readonly config: PhotoS3Config) {}
 
   static fromConfig(config: PhotoS3Config): S3Blobs {
-    const client = new S3Client({
-      region: config.region,
-      endpoint: config.endpoint,
-      forcePathStyle: config.forcePathStyle,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-      // The SDK's default flexible checksums are not implemented by every
-      // S3-compatible provider. Integrity is already enforced above this
-      // layer: the key is the sha256 the device signed.
-      requestChecksumCalculation: "WHEN_REQUIRED",
-      responseChecksumValidation: "WHEN_REQUIRED",
-    });
-    return new S3Blobs(client, config.bucket);
+    return new S3Blobs(config);
   }
 
   async write(key: string, bytes: Buffer): Promise<void> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: objectKey(key),
-        Body: bytes,
-        // PhotosService re-derives the served type from the bytes, so nothing
-        // relies on this; it is only what the provider's console shows.
-        ContentType: "application/octet-stream",
-      }),
-    );
+    const response = await signedRequest(this.config, "PUT", objectKey(key), bytes);
+    if (!response.ok) throw await requestError(response);
   }
 
   async read(key: string): Promise<Buffer | null> {
-    try {
-      const object = await this.client.send(
-        new GetObjectCommand({ Bucket: this.bucket, Key: objectKey(key) }),
-      );
-      if (!object.Body) return null;
-      return Buffer.from(await object.Body.transformToByteArray());
-    } catch (error) {
-      if (isNotFound(error)) return null;
-      throw error;
-    }
+    const response = await signedRequest(this.config, "GET", objectKey(key));
+    if (response.status === 404) return null;
+    if (!response.ok) throw await requestError(response);
+    return Buffer.from(await response.arrayBuffer());
   }
 
   async exists(key: string): Promise<boolean> {
-    try {
-      await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: objectKey(key) }));
-      return true;
-    } catch (error) {
-      if (isNotFound(error)) return false;
-      throw error;
-    }
+    const response = await signedRequest(this.config, "HEAD", objectKey(key));
+    if (response.status === 404) return false;
+    if (!response.ok) throw await requestError(response);
+    return true;
   }
 }
 
@@ -131,11 +92,88 @@ function objectKey(key: string): string {
   return key.split(sep).join("/");
 }
 
-function isNotFound(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const { name, $metadata } = error as {
-    name?: string;
-    $metadata?: { httpStatusCode?: number };
+async function requestError(response: Response): Promise<Error> {
+  const body = await response.text().catch(() => "");
+  return new Error(`S3 request failed: ${response.status} ${response.statusText} ${body}`.trim());
+}
+
+/**
+ * A minimal AWS Signature Version 4 client, just enough to PUT/GET/HEAD a
+ * single object. R2, Supabase Storage, and every other S3-compatible
+ * provider speak this same signing scheme, so no client library is needed
+ * for a request shape this small.
+ */
+async function signedRequest(
+  config: PhotoS3Config,
+  method: "PUT" | "GET" | "HEAD",
+  key: string,
+  body?: Buffer,
+): Promise<Response> {
+  const endpoint = config.endpoint ?? `https://s3.${config.region}.amazonaws.com`;
+  const url = new URL(endpoint);
+  const encodedKey = key
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  if (config.forcePathStyle) {
+    url.pathname = `/${config.bucket}/${encodedKey}`;
+  } else {
+    url.host = `${config.bucket}.${url.host}`;
+    url.pathname = `/${encodedKey}`;
+  }
+
+  const payload = body ?? Buffer.alloc(0);
+  const payloadHash = sha256Hex(payload);
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const dateStamp = amzDate.slice(0, 8);
+
+  const headers: Record<string, string> = {
+    host: url.host,
+    "x-amz-content-sha256": payloadHash,
+    "x-amz-date": amzDate,
   };
-  return name === "NoSuchKey" || name === "NotFound" || $metadata?.httpStatusCode === 404;
+  if (method === "PUT") {
+    headers["content-type"] = "application/octet-stream";
+  }
+
+  const signedHeaderNames = Object.keys(headers).sort();
+  const canonicalHeaders = signedHeaderNames.map((name) => `${name}:${headers[name]}\n`).join("");
+  const signedHeaders = signedHeaderNames.join(";");
+
+  const canonicalRequest = [
+    method,
+    url.pathname,
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+
+  const scope = `${dateStamp}/${config.region}/s3/aws4_request`;
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, scope, sha256Hex(canonicalRequest)].join("\n");
+  const key_ = signingKey(config.secretAccessKey, dateStamp, config.region);
+  const signature = createHmac("sha256", key_).update(stringToSign, "utf8").digest("hex");
+
+  headers.authorization =
+    `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${scope}, ` +
+    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  return fetch(url, {
+    method,
+    headers,
+    body: method === "PUT" ? payload : undefined,
+  });
+}
+
+function signingKey(secret: string, dateStamp: string, region: string): Buffer {
+  const kDate = createHmac("sha256", `AWS4${secret}`).update(dateStamp, "utf8").digest();
+  const kRegion = createHmac("sha256", kDate).update(region, "utf8").digest();
+  const kService = createHmac("sha256", kRegion).update("s3", "utf8").digest();
+  return createHmac("sha256", kService).update("aws4_request", "utf8").digest();
+}
+
+function sha256Hex(data: Buffer | string): string {
+  return createHash("sha256").update(data).digest("hex");
 }
