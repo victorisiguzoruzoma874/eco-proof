@@ -21,19 +21,20 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     dockerCommand: node apps/backend/dist/main.js
-    plan: starter
+    # Free: the instance sleeps after 15 minutes idle and the next request
+    # waits for it to wake.
+    plan: free
     region: frankfurt
     healthCheckPath: /health
 
-    # Runs after the image is built and before traffic moves to it, so the
-    # schema is never behind the code that expects it. `migrationsRun` stays
-    # false in the app itself: several instances booting at once would race to
-    # apply the same migration.
-    #
-    # NOTE: preDeployCommand requires a paid instance type. On the free plan,
-    # delete these two lines and run migrations by hand from a shell instead:
+    # No preDeployCommand: it needs a paid instance type, and so does a shell
+    # on the service. Migrations are run by hand against DATABASE_URL from a
+    # clone after the build (`migrationsRun` stays false in the app itself —
+    # several instances booting at once would race to apply the same one):
+    #   npm run build -w @proofchain/backend
     #   npm run migration:run:prod -w @proofchain/backend
-    preDeployCommand: npm run migration:run:prod -w @proofchain/backend
+    # On a paid plan, add this back so the schema is never behind the code:
+    #   preDeployCommand: npm run migration:run:prod -w @proofchain/backend
 
     envVars:
       - key: NODE_ENV
