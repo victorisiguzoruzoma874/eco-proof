@@ -4,7 +4,6 @@ import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { ALL_ENTITIES } from "./database/entities";
-import { createInMemoryDataSource } from "./database/in-memory-datasource";
 import { isInMemoryMode } from "./database/in-memory-flag";
 import { loadConfig } from "./config/configuration";
 import { AuthModule, JwtAuthGuard } from "./auth/auth.module";
@@ -59,6 +58,11 @@ import { RateLimitGuard } from "./common/rate-limit.guard";
       // through to TypeORM's own default construction from `options`.
       dataSourceFactory: async (options) => {
         if (isInMemoryMode()) {
+          // Loaded only on this path: pg-mem is a devDependency, so the pruned
+          // production image does not have it, and a top-level import would
+          // crash every production boot with "Cannot find module 'pg-mem'".
+          const { createInMemoryDataSource } =
+            require("./database/in-memory-datasource") as typeof import("./database/in-memory-datasource");
           return createInMemoryDataSource();
         }
         if (!options) {
