@@ -59,6 +59,9 @@ export default defineConfig({
       // Source, not dist, for the same reason as the others: one implementation
       // of the code shape and label rules across device and server.
       "@shared/materials": resolve(__dirname, "../../packages/shared/src/materials.ts"),
+      // Node-free by construction, like canonical-core: the phone and the
+      // server must sign and verify byte-identical request lines.
+      "@shared/device-auth": resolve(__dirname, "../../packages/shared/src/device-auth.ts"),
       // The one wording of a failed integrity check that a collector ever sees,
       // shared so the two capture apps cannot drift apart on it.
       "@shared/integrity-copy": resolve(__dirname, "../../packages/shared/src/integrity-copy.ts"),

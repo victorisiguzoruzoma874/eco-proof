@@ -18,7 +18,10 @@ import { seedDevelopmentData } from "./database/seed";
 async function bootstrap(): Promise<void> {
   const config = loadConfig();
   const logger = new Logger("bootstrap");
-  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  // `rawBody` is what `DeviceAuthGuard` hashes to bind a device signature to
+  // the exact bytes that arrived. Re-serialising the parsed body would not
+  // reproduce them, so the raw buffer has to be kept.
+  const app = await NestFactory.create(AppModule, { bufferLogs: false, rawBody: true });
 
   app.use(helmet());
 

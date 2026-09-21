@@ -1,8 +1,14 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { QueryFailedError, Repository } from "typeorm";
 import { randomInt } from "node:crypto";
-import type { MaterialType } from "@proofchain/shared";
+import type { IntegrityVerdict, MaterialType, WeighInPayload } from "@proofchain/shared";
 import {
   CollectionEventEntity,
   CollectionRequestEntity,
@@ -11,6 +17,7 @@ import {
   HubEntity,
 } from "../database/entities";
 import { MaterialsService } from "../materials/materials.service";
+import { EventsService } from "../events/events.service";
 import type { CreateCollectionRequestDto } from "../common/dto";
 
 const UNIQUE_VIOLATION = "23505";
@@ -33,6 +40,34 @@ function generateRedemptionCode(): string {
     code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   }
   return code;
+}
+
+/** One row of a collector's job list, flattened for a field phone. */
+export interface CollectorJobView {
+  id: string;
+  hubId: string;
+  hubName: string | null;
+  hubCode: string | null;
+  material: MaterialType;
+  estimatedWeightKg: number | null;
+  address: string | null;
+  notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: string;
+  createdAt: string;
+}
+
+/** What the phone gets back after a successful doorstep collection. */
+export interface CollectResult {
+  requestId: string;
+  eventId: string;
+  payloadHash: string;
+  /** The code the requester scans. Rendered as a QR on the collector's screen. */
+  redemptionCode: string;
+  weightKg: number;
+  material: MaterialType;
+  integrity: IntegrityVerdict;
 }
 
 /**
@@ -61,6 +96,7 @@ export class RequestsService {
     @InjectRepository(EventReweighEntity)
     private readonly reweighs: Repository<EventReweighEntity>,
     private readonly materials: MaterialsService,
+    private readonly events_: EventsService,
   ) {}
 
   private async require(id: string): Promise<CollectionRequestEntity> {
@@ -78,6 +114,15 @@ export class RequestsService {
     // retired is EventsService's call to make, not this one's to duplicate.
     await this.materials.assertKnown(dto.material);
 
+    // Both or neither. Half a coordinate pair is not a location, and storing
+    // one would drop a pin on the null meridian — worse than having no pin at
+    // all, because the collector would trust it.
+    const hasLatitude = dto.latitude !== undefined && dto.latitude !== null;
+    const hasLongitude = dto.longitude !== undefined && dto.longitude !== null;
+    if (hasLatitude !== hasLongitude) {
+      throw new BadRequestException("latitude and longitude must be provided together");
+    }
+
     return this.requests.save(
       this.requests.create({
         requesterId,
@@ -86,11 +131,15 @@ export class RequestsService {
         estimatedWeightKg: dto.estimatedWeightKg ?? null,
         address: dto.address?.trim() || null,
         notes: dto.notes?.trim() || null,
+        latitude: hasLatitude ? (dto.latitude as number) : null,
+        longitude: hasLongitude ? (dto.longitude as number) : null,
         status: "requested",
         assignedCollectorId: null,
         eventId: null,
         redemptionCode: null,
         redeemedAt: null,
+        creditedWeightKg: null,
+        reconciledAt: null,
       }),
     );
   }
@@ -107,6 +156,126 @@ export class RequestsService {
       },
       order: { createdAt: "DESC" },
     });
+  }
+
+  /**
+   * The collector's job list, as read by a field phone.
+   *
+   * Scoped to one collector and to the two statuses that still need someone to
+   * turn up. `assigned` is the dispatched work; `requested` at the same hubs is
+   * deliberately NOT included — an unassigned request is the operator's to
+   * route, and showing every open job to every phone would turn dispatch into a
+   * race between collectors driving to the same address.
+   *
+   * Returns the hub alongside each request because the phone has no other way
+   * to resolve a hub id to a name, and a job card reading "hub
+   * 7f3a-..." helps nobody standing on a street.
+   */
+  async assignedTo(collectorId: string): Promise<CollectorJobView[]> {
+    const requests = await this.requests.find({
+      where: { assignedCollectorId: collectorId, status: "assigned" },
+      order: { createdAt: "ASC" },
+    });
+    if (requests.length === 0) return [];
+
+    const hubs = await this.hubs.find();
+    const byId = new Map(hubs.map((h) => [h.id, h]));
+
+    return requests.map((request) => {
+      const hub = byId.get(request.hubId);
+      return {
+        id: request.id,
+        hubId: request.hubId,
+        hubName: hub?.name ?? null,
+        hubCode: hub?.code ?? null,
+        material: request.material,
+        estimatedWeightKg: request.estimatedWeightKg,
+        address: request.address,
+        notes: request.notes,
+        latitude: request.latitude,
+        longitude: request.longitude,
+        status: request.status,
+        createdAt: request.createdAt.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Collect at the door: ingest the collector's signed weigh-in and issue the
+   * redemption code in one step.
+   *
+   * This is the doorstep counterpart to `fulfill`. `fulfill` links a request to
+   * a weigh-in the hub has already re-weighed, and is the right shape when the
+   * material travels to the hub before anyone is paid. This method instead
+   * issues the code while the collector is still standing there, so the
+   * requester can scan it before the van pulls away.
+   *
+   * The weight that ends up credited is therefore the collector's scale
+   * reading, not the hub's. That is a real reduction in independent
+   * corroboration and it is taken deliberately, bounded two ways: a quarantined
+   * weigh-in can never issue a code (so the six integrity checks still gate the
+   * door), and the hub's later re-weigh still runs, reconciling the difference
+   * through `WalletService.reconcile` rather than being discarded.
+   */
+  async collect(
+    id: string,
+    device: { deviceId: string; collectorId: string },
+    payload: WeighInPayload,
+    signature: string,
+  ): Promise<CollectResult> {
+    const request = await this.require(id);
+
+    if (request.status !== "requested" && request.status !== "assigned") {
+      throw new BadRequestException(`request ${id} is "${request.status}" and cannot be collected`);
+    }
+
+    // An assigned job belongs to the collector it was assigned to. An
+    // unassigned one is first-come, which is what lets a dispatcher hand a
+    // route out verbally without also clicking Assign.
+    if (request.assignedCollectorId && request.assignedCollectorId !== device.collectorId) {
+      throw new ForbiddenException(`request ${id} is assigned to another collector`);
+    }
+
+    // The signed payload must agree with the authenticated device about who is
+    // capturing. Without this a phone could sign a weigh-in naming a different
+    // collector and still have it accepted, because the header signature and
+    // the payload signature are checked against the same key but cover
+    // different claims.
+    if (payload.deviceId !== device.deviceId || payload.collectorId !== device.collectorId) {
+      throw new ForbiddenException("the signed weigh-in does not match the authenticated device");
+    }
+
+    if (payload.material !== request.material) {
+      throw new BadRequestException(
+        `this request is for "${request.material}" but the weigh-in is for "${payload.material}"`,
+      );
+    }
+
+    const ingest = await this.events_.ingest(payload, signature);
+
+    // A quarantined weigh-in is stored (it is evidence) but must never issue a
+    // code — that is the whole reason the integrity checks run before anyone is
+    // credited, and it is the one gate the doorstep path does not relax.
+    if (ingest.quarantined) {
+      throw new BadRequestException({
+        message: ingest.duplicate
+          ? "this weigh-in has already been submitted"
+          : "this weigh-in failed integrity checks and cannot complete a collection",
+        integrity: ingest.integrity,
+      });
+    }
+
+    const fulfilled = await this.issueCode(request.id, ingest.eventId);
+
+    return {
+      requestId: fulfilled.id,
+      eventId: ingest.eventId,
+      payloadHash: ingest.payloadHash,
+      redemptionCode: fulfilled.redemptionCode as string,
+      weightKg: payload.weightKg,
+      material: fulfilled.material,
+      integrity: ingest.integrity,
+    };
   }
 
   async assign(id: string, collectorId: string): Promise<CollectionRequestEntity> {
@@ -159,6 +328,15 @@ export class RequestsService {
       throw new BadRequestException(`event ${eventId}'s reweigh was rejected and cannot fulfill a request`);
     }
 
+    return this.issueCode(id, eventId);
+  }
+
+  /**
+   * Link the event and mint the code — the step `fulfill` (hub-verified) and
+   * `collect` (doorstep) both end in, kept in one place so the two paths can
+   * never drift on how a code is generated or how a collision is handled.
+   */
+  private async issueCode(id: string, eventId: string): Promise<CollectionRequestEntity> {
     for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
       const redemptionCode = generateRedemptionCode();
       try {

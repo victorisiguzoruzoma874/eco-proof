@@ -49,6 +49,16 @@ import {
   signWeighIn,
 } from "./lib/identity";
 import * as queue from "./lib/queue";
+import QRCode from "qrcode";
+import {
+  collectRequest,
+  fetchAssignedJobs,
+  newJobsSince,
+  notifyNewJobs,
+  requestNotificationPermission,
+  type CollectOutcome,
+  type CollectorJob,
+} from "./lib/jobs";
 import {
   backendUrl,
   enrolDevice,
@@ -122,6 +132,30 @@ let notice: { tone: "good" | "bad" | "warn"; text: string } | null = null;
  * down or move on to the next sack.
  */
 let lastProof: { lookupCode: string; weightKg: number } | null = null;
+
+/**
+ * The pickup requests dispatched to this collector, and which one is being
+ * worked right now.
+ *
+ * `jobs` is refreshed by a poll and is allowed to be stale — it is a to-do
+ * list, not a source of truth. `activeJob` is what turns the next commit from
+ * a plain weigh-in into a doorstep collection: when it is set, committing
+ * posts to `/requests/:id/collect` and comes back with a redemption code
+ * instead of queueing offline.
+ */
+let jobs: CollectorJob[] = [];
+let activeJob: CollectorJob | null = null;
+let jobsError: string | null = null;
+
+/**
+ * The code to show the requester, plus its QR as a data URI.
+ *
+ * Rendered on the collector's screen for the requester to scan there and then
+ * — that is the whole point of the doorstep flow. It stays up until the
+ * collector dismisses it, because walking away from it is the one thing that
+ * loses the code, and the requester may need a moment to find their phone.
+ */
+let doorProof: { outcome: CollectOutcome; qrDataUrl: string } | null = null;
 
 /**
  * The camera is a sensor behind its own permission and can fail on its own, so
@@ -480,6 +514,97 @@ function proofCardHtml(): string {
       </div>`;
 }
 
+/**
+ * A map link for a job.
+ *
+ * Coordinates win when the requester allowed geolocation — a pin is
+ * unambiguous where a typed address is not. Otherwise the address is handed to
+ * the map as a search query, which is exactly what a collector would type
+ * themselves. `geo:` is deliberately not used: Android honours it, iOS does
+ * not, and a link that silently does nothing on half the phones in the field
+ * is worse than one extra tap.
+ */
+function mapHref(job: CollectorJob): string | null {
+  if (job.latitude !== null && job.longitude !== null) {
+    return `https://www.google.com/maps/search/?api=1&query=${job.latitude},${job.longitude}`;
+  }
+  if (job.address) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`;
+  }
+  return null;
+}
+
+/**
+ * The dispatched-jobs panel.
+ *
+ * Hidden entirely when there is nothing assigned, rather than showing an empty
+ * shell: a collector doing walk-up collection has no jobs and should not have
+ * to scroll past a panel telling them so on every render.
+ */
+function jobsPanelHtml(): string {
+  if (jobsError) {
+    return `<p class="notice" data-tone="warn" role="status">${escapeHtml(jobsError)}</p>`;
+  }
+  if (jobs.length === 0) return "";
+
+  const rows = jobs
+    .map((job) => {
+      const active = activeJob?.id === job.id;
+      const href = mapHref(job);
+      const estimate =
+        job.estimatedWeightKg !== null ? `~${escapeHtml(String(job.estimatedWeightKg))} kg` : "weight unknown";
+
+      return `
+        <li class="job${active ? " job-active" : ""}">
+          <div class="job-head">
+            <strong>${escapeHtml(job.material)}</strong>
+            <span class="hint">${escapeHtml(estimate)}</span>
+          </div>
+          <p class="job-address">${escapeHtml(job.address ?? job.hubName ?? "No address given")}</p>
+          ${job.notes ? `<p class="hint">${escapeHtml(job.notes)}</p>` : ""}
+          <div class="job-actions">
+            ${href ? `<a class="ghost small" href="${escapeHtml(href)}" target="_blank" rel="noopener">Open map</a>` : ""}
+            <button class="${active ? "ghost" : "action"} small" type="button" data-job="${escapeHtml(job.id)}">
+              ${active ? "Working this" : "Start pickup"}
+            </button>
+          </div>
+        </li>`;
+    })
+    .join("");
+
+  return `
+      <section class="panel">
+        <h2 class="panel-title">Assigned pickups</h2>
+        <ul class="jobs">${rows}</ul>
+      </section>`;
+}
+
+/**
+ * The QR the requester scans at the door.
+ *
+ * The code is printed beneath it at full size, and that is not decoration: a
+ * cracked screen, a dead requester phone or a camera that will not focus all
+ * end the same way, with someone typing eight characters. The alphabet excludes
+ * 0/O/1/I precisely so that fallback works.
+ */
+function doorProofHtml(): string {
+  if (!doorProof) return "";
+  const { outcome, qrDataUrl } = doorProof;
+
+  return `
+      <div class="door-proof" role="status">
+        <span class="label">Collected · ${escapeHtml(outcome.weightKg.toFixed(3))} kg ${escapeHtml(outcome.material)}</span>
+        <img class="qr-code" src="${escapeHtml(qrDataUrl)}" alt="QR code for redemption code ${escapeHtml(outcome.redemptionCode)}" />
+        <span class="proof-code">${escapeHtml(outcome.redemptionCode)}</span>
+        <p class="hint">
+          Show this to the customer now. They scan it in their ProofChain wallet to
+          be credited for ${escapeHtml(outcome.weightKg.toFixed(3))} kg. If the scan
+          will not work, they can type the code instead.
+        </p>
+        <button class="ghost small" type="button" id="dismiss-door">Done</button>
+      </div>`;
+}
+
 function provisionScreen(): string {
   return `
     ${masthead()}
@@ -590,6 +715,8 @@ async function captureScreen(): Promise<string> {
       </div>
 
       ${noticeHtml()}
+      ${doorProofHtml()}
+      ${jobsPanelHtml()}
       ${proofCardHtml()}
 
       <div class="field">
@@ -879,6 +1006,20 @@ function wireCapture(): void {
   });
 
   on("commit", "click", commit);
+  on("dismiss-door", "click", () => {
+    doorProof = null;
+    void render();
+  });
+
+  // Delegated rather than one listener per row: the list is re-rendered on
+  // every poll, and per-row listeners would be rebound each time.
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-job]")) {
+    button.addEventListener("click", () => {
+      const job = jobs.find((j) => j.id === button.dataset.job);
+      if (!job) return;
+      selectJob(job);
+    });
+  }
   on("sync", "click", runSync);
   on("forget-device", "click", forgetDevice);
 
@@ -890,6 +1031,86 @@ function wireCapture(): void {
 }
 
 // ---------------------------------------------------------------- actions
+
+/**
+ * Adopt a dispatched job as the thing being captured next.
+ *
+ * Switching the hub and material to the job's own is the point: a collector who
+ * taps a PET pickup and then signs an HDPE weigh-in against it has done unpaid
+ * work, because the server refuses the mismatch. Pre-selecting removes the
+ * chance to get it wrong rather than validating it afterwards.
+ *
+ * Tapping the active job again clears it, which is how a collector falls back
+ * to an ordinary offline weigh-in without having to complete the pickup.
+ */
+function selectJob(job: CollectorJob): void {
+  if (activeJob?.id === job.id) {
+    activeJob = null;
+    notice = { tone: "warn", text: "Pickup cleared. The next weigh-in will queue as normal." };
+    void render();
+    return;
+  }
+
+  activeJob = job;
+  material = job.material as MaterialType;
+
+  // Switch hubs only when this device was actually enrolled against the job's
+  // hub. A phone paired before multi-hub support has one hub and no way to
+  // learn about others offline (see `Provisioning.hubs`), so silently
+  // reassigning it would sign every weigh-in against a hub it cannot verify.
+  const p = provisioning;
+  if (p && job.hubId !== p.hubId && hubChoices(p.hubs, p).some((h) => h.id === job.hubId)) {
+    saveProvisioning({ ...p, hubId: job.hubId });
+  }
+
+  notice = {
+    tone: "good",
+    text: `Working ${job.material} at ${job.address ?? job.hubName ?? "the pickup address"}.`,
+  };
+  void render();
+}
+
+/**
+ * Poll for newly dispatched jobs.
+ *
+ * Polling rather than push: push would need VAPID keys and a subscription
+ * lifecycle on both ends, and a 45-second poll is well inside the time it takes
+ * to drive anywhere. Every failure is swallowed into `jobsError` — a job list
+ * that cannot load is a degraded to-do list, never a reason to break capture,
+ * which is the part of this app that must work offline regardless.
+ */
+async function pollJobs(): Promise<void> {
+  const p = provisioning;
+  if (!p || !navigator.onLine) return;
+
+  try {
+    const fetched = await fetchAssignedJobs(backendUrl(), identity, p.deviceId);
+    jobs = fetched;
+    jobsError = null;
+
+    // Keep the active job's details fresh, but drop it if the operator
+    // reassigned or cancelled it while the collector was en route.
+    if (activeJob) {
+      activeJob = fetched.find((job) => job.id === activeJob!.id) ?? null;
+    }
+
+    const fresh = newJobsSince(fetched);
+    if (fresh.length > 0) {
+      await notifyNewJobs(fresh);
+      notice = {
+        tone: "good",
+        text:
+          fresh.length === 1
+            ? `New pickup: ${fresh[0]!.material} at ${fresh[0]!.address ?? "an address"}.`
+            : `${fresh.length} new pickups assigned.`,
+      };
+    }
+  } catch (error) {
+    jobsError = `Could not refresh pickups: ${describeError(error, "unknown error")}`;
+  }
+
+  await render();
+}
 
 async function commit(): Promise<void> {
   const p = provisioning!;
@@ -932,19 +1153,35 @@ async function commit(): Promise<void> {
     nonce: randomNonce(),
   };
 
-  await queue.enqueue({
-    id: randomId(),
-    payload,
-    signature: signWeighIn(payload, identity),
-    photo,
-    status: "queued",
-    attempts: 0,
-    lastError: null,
-    createdAt: new Date().toISOString(),
-    syncedAt: null,
-    serverEventId: null,
-    photoUploadedAt: null,
-  });
+  const signature = signWeighIn(payload, identity);
+
+  // A doorstep pickup takes the online path: the redemption code is minted by
+  // the server (it must be unique across every request) and the requester is
+  // standing there waiting for it, so there is nothing useful to queue.
+  if (activeJob) {
+    const completed = await commitDoorstep(payload, signature, weightInput);
+    if (!completed) return; // the failure is already on screen; keep the evidence
+  } else {
+    await queue.enqueue({
+      id: randomId(),
+      payload,
+      signature,
+      photo,
+      status: "queued",
+      attempts: 0,
+      lastError: null,
+      createdAt: new Date().toISOString(),
+      syncedAt: null,
+      serverEventId: null,
+      photoUploadedAt: null,
+    });
+
+    notice = { tone: "good", text: `Signed and queued ${payload.weightKg.toFixed(3)} kg.` };
+    lastProof = {
+      lookupCode: computeEventPayloadHash(payload).slice(0, 10),
+      weightKg: payload.weightKg,
+    };
+  }
 
   // Reset only the per-weigh-in evidence; keep material, since the next sack is
   // nearly always the same material.
@@ -955,14 +1192,68 @@ async function commit(): Promise<void> {
   // Cleared explicitly: render() deliberately carries the weight field across
   // re-renders, so a committed weigh-in must blank it or the next one inherits it.
   if (weightInput) weightInput.value = "";
-  notice = { tone: "good", text: `Signed and queued ${payload.weightKg.toFixed(3)} kg.` };
-  lastProof = {
-    lookupCode: computeEventPayloadHash(payload).slice(0, 10),
-    weightKg: payload.weightKg,
-  };
 
   await render();
   void runSync();
+}
+
+/**
+ * Complete a dispatched pickup: post the signed weigh-in and put the resulting
+ * QR on screen.
+ *
+ * Returns false when the collection did not land, and on that path the photo
+ * and weight are deliberately left untouched so the collector can retry
+ * without re-photographing a sack that is already in the van. The failure is
+ * almost always a dead link at a doorstep, and re-taking the evidence would be
+ * the one thing they cannot do.
+ */
+async function commitDoorstep(
+  payload: WeighInPayload,
+  signature: string,
+  weightInput: HTMLInputElement | null,
+): Promise<boolean> {
+  const p = provisioning!;
+  const job = activeJob!;
+
+  if (!navigator.onLine) {
+    notice = {
+      tone: "bad",
+      text: "No connection. A pickup needs a signal to issue the customer's code — move and retry, or clear the pickup to queue this weigh-in instead.",
+    };
+    await render();
+    return false;
+  }
+
+  try {
+    const outcome = await collectRequest(
+      backendUrl(),
+      identity,
+      p.deviceId,
+      job.id,
+      payload,
+      signature,
+    );
+
+    // Rendered at error correction level M and a generous margin: this is
+    // scanned off one phone screen by another, often in sunlight, and the
+    // default quiet zone is not enough for a camera that cannot get close.
+    const qrDataUrl = await QRCode.toDataURL(outcome.redemptionCode, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 320,
+    });
+
+    doorProof = { outcome, qrDataUrl };
+    activeJob = null;
+    jobs = jobs.filter((j) => j.id !== job.id);
+    notice = null;
+    if (weightInput) weightInput.value = "";
+    return true;
+  } catch (error) {
+    notice = { tone: "bad", text: describeError(error, "The pickup could not be completed.") };
+    await render();
+    return false;
+  }
 }
 
 /**
@@ -1094,6 +1385,9 @@ window.addEventListener("online", () => {
   void runSync();
   void syncCatalogue();
   void syncHubs();
+  // A collector who has just regained signal is the one most likely to have
+  // been dispatched something while they were dark.
+  void pollJobs();
 });
 window.addEventListener("offline", () => {
   void render();
@@ -1112,10 +1406,25 @@ setInterval(() => {
   void syncHubs();
 }, 15 * 60_000);
 
+// Dispatch polling. Faster than the catalogue refresh and slower than the
+// queue drain: a new pickup is worth knowing about within a minute, but this
+// costs a signature and a round trip on a metered field connection, so it does
+// not run at the sync cadence.
+setInterval(() => {
+  void pollJobs();
+}, 45_000);
+
 void queue.pruneSynced();
 void render();
 void syncCatalogue();
 void syncHubs();
+void pollJobs();
+
+// Asked for once, on a phone that is already provisioned — never on first
+// paint of the pairing screen, where a permission prompt would land before the
+// collector knows what the app is. A refusal is remembered by the browser and
+// simply means jobs arrive as an in-app banner instead.
+if (provisioning) void requestNotificationPermission();
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {

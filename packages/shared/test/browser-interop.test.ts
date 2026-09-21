@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ed25519 } from "@noble/curves/ed25519";
 import { canonicalEventPayload } from "../src/canonical-core.js";
 import { eventPayloadHash } from "../src/canonical.js";
-import { verifyWeighInSignature } from "../src/signing.js";
+import { verifyDeviceRequestSignature, verifyWeighInSignature } from "../src/signing.js";
+import { canonicalDeviceRequest } from "../src/device-auth.js";
 import type { WeighInPayload } from "../src/types.js";
 
 /**
@@ -67,5 +68,55 @@ describe("browser-signed weigh-ins verify on the server", () => {
 
     // 32 raw bytes -> 44 base64 chars ending in '='. The DTO regex depends on it.
     expect(stored).toMatch(/^[A-Za-z0-9+/]{43}=$/);
+  });
+});
+
+/**
+ * The same tripwire, for the device-signed request line.
+ *
+ * The capture PWA signs job-list reads and doorstep collections with
+ * @noble/curves over `canonicalDeviceRequest`; `DeviceAuthGuard` verifies them
+ * with node:crypto over the identical encoder. A disagreement here does not
+ * fail loudly — it makes every phone in the field look unauthenticated, so the
+ * collector simply sees an empty job list and nobody learns why.
+ */
+describe("browser-signed device requests verify on the server", () => {
+  const envelope = {
+    method: "POST",
+    path: "/requests/803bde5d-c7f2-4f98-80b8-15d97fb06517/collect",
+    deviceId: "1c7a101f-d6d0-4039-b80f-bd4515b6bafb",
+    timestamp: "2026-09-21T09:15:00.000Z",
+    nonce: "b".repeat(32),
+    bodyHash: "c".repeat(64),
+  };
+
+  /** Exactly what apps/capture/src/lib/jobs.ts does, minus the browser APIs. */
+  function signRequestLikeTheBrowser(privateKey: Uint8Array): string {
+    const message = new TextEncoder().encode(canonicalDeviceRequest(envelope));
+    return Buffer.from(ed25519.sign(message, privateKey)).toString("base64");
+  }
+
+  it("accepts a request signature produced by @noble/curves", () => {
+    const privateKey = ed25519.utils.randomPrivateKey();
+
+    expect(
+      verifyDeviceRequestSignature(
+        envelope,
+        signRequestLikeTheBrowser(privateKey),
+        publicKeyBase64(privateKey),
+      ),
+    ).toBe(true);
+  });
+
+  /**
+   * The encoder must be byte-identical across platforms, not merely
+   * compatible: both sides hash and sign these exact bytes, so a difference of
+   * one character in either direction breaks every request.
+   */
+  it("encodes the request line to the same bytes on both sides", () => {
+    const fromBrowser = new TextEncoder().encode(canonicalDeviceRequest(envelope));
+    const fromServer = Buffer.from(canonicalDeviceRequest(envelope), "utf8");
+
+    expect(Buffer.from(fromBrowser).equals(fromServer)).toBe(true);
   });
 });

@@ -38,6 +38,56 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
     Object.fromEntries(materials.map((m) => [m.code, 0])),
   );
 
+  /**
+   * The pickup pin, if the requester chooses to share it.
+   *
+   * Opt-in behind a button rather than requested on mount: a permission prompt
+   * that appears before the person has said what they want reads as a demand,
+   * and most people dismiss it permanently. Asking after they have decided to
+   * book a pickup is when the reason for it is obvious.
+   *
+   * Never required. A typed address is how every pickup worked before this
+   * existed, and a refusal here must cost nothing.
+   */
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
+
+  function shareLocation() {
+    if (!("geolocation" in navigator)) {
+      setLocationNote("This browser cannot share a location. Your typed address will be used.");
+      return;
+    }
+
+    setLocating(true);
+    setLocationNote(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({
+          // Six decimals is ~11 cm — finer than any phone fix, and the column's
+          // precision. Trimming here keeps the value the backend stores identical
+          // to the one shown back.
+          latitude: Number(position.coords.latitude.toFixed(6)),
+          longitude: Number(position.coords.longitude.toFixed(6)),
+        });
+        setLocating(false);
+        setLocationNote(null);
+      },
+      (error) => {
+        setLocating(false);
+        setLocationNote(
+          error.code === error.PERMISSION_DENIED
+            ? "Location not shared. Your collector will use the address above."
+            : "Could not get a location fix. Your collector will use the address above.",
+        );
+      },
+      // A doorstep pin is worth waiting a few seconds for, but not worth
+      // hanging the form on; a cached fix from the last minute is fine.
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
+
   // Global default rates only (hubId: null) — same simplification as the
   // "Today's rates" table on /requester/dashboard: a hub-specific override
   // may exist, but this is meant as a quick estimate, not a locked-in quote.
@@ -172,6 +222,34 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
             Address (optional) — where the material can be picked up from
             <input id="address" name="address" maxLength={500} placeholder="Street and landmark" />
           </label>
+          <div className="rq-field">
+            <span>Pickup location (optional)</span>
+            <p style={{ margin: "0 0 0.5rem", fontSize: "0.8125rem", color: "var(--rq-text-soft)" }}>
+              {coords
+                ? `Pin shared — your collector will get directions straight to you.`
+                : "Share a pin so your collector can navigate to you instead of hunting for the address."}
+            </p>
+            <button
+              className="rq-btn"
+              type="button"
+              onClick={shareLocation}
+              disabled={locating}
+              style={{ justifyContent: "center" }}
+            >
+              {locating ? "Getting location…" : coords ? "Update my location" : "Use my current location"}
+            </button>
+            {locationNote ? (
+              <p style={{ margin: "0.5rem 0 0", fontSize: "0.8125rem", color: "var(--rq-text-soft)" }}>
+                {locationNote}
+              </p>
+            ) : null}
+            {coords ? (
+              <>
+                <input type="hidden" name="latitude" value={coords.latitude} />
+                <input type="hidden" name="longitude" value={coords.longitude} />
+              </>
+            ) : null}
+          </div>
           <label className="rq-field" htmlFor="notes">
             Notes (optional)
             <textarea id="notes" name="notes" maxLength={1000} />

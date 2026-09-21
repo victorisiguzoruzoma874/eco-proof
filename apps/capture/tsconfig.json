@@ -31,6 +31,9 @@
       "@shared/materials": [
         "../../packages/shared/src/materials.ts"
       ],
+      "@shared/device-auth": [
+        "../../packages/shared/src/device-auth.ts"
+      ],
       "@shared/integrity-copy": [
         "../../packages/shared/src/integrity-copy.ts"
       ]

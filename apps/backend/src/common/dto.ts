@@ -422,6 +422,26 @@ export class CreateCollectionRequestDto {
   @IsOptional() @IsString() @MaxLength(500) address?: string;
 
   @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+
+  /**
+   * Optional pickup coordinates for the collector's map.
+   *
+   * Both or neither: a latitude without a longitude is not a location, and
+   * silently keeping half of one would put a pin on the null meridian. The
+   * pairing is enforced in `RequestsService.create`, not here, because a
+   * cross-field rule belongs where the rest of the request's invariants live.
+   */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 6 })
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 6 })
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
 }
 
 export class AssignRequestDto {
@@ -430,6 +450,25 @@ export class AssignRequestDto {
 
 export class FulfillRequestDto {
   @IsUUID() eventId: string;
+}
+
+/**
+ * A doorstep collection: the signed weigh-in the collector just took, posted
+ * against the request it fulfils.
+ *
+ * Structurally identical to `SubmitWeighInDto` because it carries exactly the
+ * same signed artefact — the request id travels in the path, not the payload,
+ * so the weigh-in schema and its signature are untouched by this feature.
+ */
+export class CollectRequestDto {
+  @ValidateNested()
+  @Type(() => WeighInPayloadDto)
+  payload: WeighInPayloadDto;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  signature: string;
 }
 
 export class RedeemCodeDto {

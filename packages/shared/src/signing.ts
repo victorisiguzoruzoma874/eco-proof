@@ -8,6 +8,7 @@ import {
   type KeyObject,
 } from "node:crypto";
 import { canonicalEventPayload } from "./canonical.js";
+import { canonicalDeviceRequest, type DeviceRequestEnvelope } from "./device-auth.js";
 import type { WeighInPayload } from "./types.js";
 
 /**
@@ -97,6 +98,33 @@ export function verifyWeighInSignature(
 
     const key = resolvePublicKey(publicKey);
     const message = Buffer.from(canonicalEventPayload(payload), "utf8");
+    return cryptoVerify(null, message, key, signature);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verify a device-signed request line (see `device-auth.ts`).
+ *
+ * Same contract as `verifyWeighInSignature`: returns false rather than
+ * throwing, because the input is untrusted and a malformed header must
+ * produce a 401, never a 500. Freshness is the caller's check — this function
+ * answers only "did this device sign this exact request line".
+ */
+export function verifyDeviceRequestSignature(
+  envelope: DeviceRequestEnvelope,
+  signatureBase64: string,
+  publicKey: PublicKeyInput,
+): boolean {
+  try {
+    if (!signatureBase64) return false;
+
+    const signature = Buffer.from(signatureBase64, "base64");
+    if (signature.length !== 64) return false;
+
+    const key = resolvePublicKey(publicKey);
+    const message = Buffer.from(canonicalDeviceRequest(envelope), "utf8");
     return cryptoVerify(null, message, key, signature);
   } catch {
     return false;

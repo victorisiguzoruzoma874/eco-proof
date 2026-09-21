@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requesterApi, ApiError, type Requester, type WalletView } from "@/lib/api";
 import { formatDateTime, formatNaira } from "@/lib/format";
+import { ScanButton } from "./ScanButton";
 
 export const dynamic = "force-dynamic";
 
@@ -150,9 +151,12 @@ export default async function RequesterWalletPage({
       <section className="rq-section">
         <h2>Redeem a code</h2>
         <p style={{ color: "var(--rq-text-soft)", marginBottom: "0.75rem" }}>
-          Enter the code from a collected pickup&rsquo;s QR (or its printed text) to credit its
-          hub-verified weight to your wallet. Each code redeems once.
+          Scan the QR your collector shows you at the door — or type the code printed under it —
+          to credit the weight they collected to your wallet. Each code redeems once.
         </p>
+        {/* Renders nothing where BarcodeDetector is unavailable, leaving the
+            typed-code path below as the only one. See ScanButton. */}
+        <ScanButton />
         <form action={redeemAction}>
           <label className="rq-field" htmlFor="redemptionCode">
             Redemption code

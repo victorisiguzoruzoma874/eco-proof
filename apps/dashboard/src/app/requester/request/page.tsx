@@ -36,6 +36,19 @@ async function requestPickup(formData: FormData) {
   const address = String(formData.get("address") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
 
+  // Written into hidden inputs by the form only if the requester granted
+  // geolocation. Parsed defensively and kept only as a complete pair: half a
+  // coordinate is not a location, and the backend refuses one anyway.
+  const latitude = Number(formData.get("latitude"));
+  const longitude = Number(formData.get("longitude"));
+  const hasCoords =
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    // `Number("")` is 0, which is a real coordinate off the coast of Ghana —
+    // so an empty field has to be excluded explicitly, not by falsiness.
+    String(formData.get("latitude") ?? "").trim() !== "" &&
+    String(formData.get("longitude") ?? "").trim() !== "";
+
   const weighed: { code: string; weightKg: number }[] = [];
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith("material-")) continue;
@@ -65,6 +78,7 @@ async function requestPickup(formData: FormData) {
         estimatedWeightKg: weightKg,
         ...(address ? { address } : {}),
         ...(notes ? { notes } : {}),
+        ...(hasCoords ? { latitude, longitude } : {}),
       });
     }
   } catch (error) {

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { CollectionEventEntity, EventReweighEntity } from "../database/entities";
+import { WalletService } from "../wallet/wallet.service";
 import type { RecordReweighDto } from "../common/dto";
 
 /**
@@ -24,6 +25,7 @@ export class ReweighService {
     private readonly reweighs: Repository<EventReweighEntity>,
     @InjectRepository(CollectionEventEntity)
     private readonly events: Repository<CollectionEventEntity>,
+    private readonly wallet: WalletService,
   ) {}
 
   async list(eventId: string): Promise<EventReweighEntity[]> {
@@ -56,7 +58,7 @@ export class ReweighService {
       );
     }
 
-    return this.reweighs.save(
+    const saved = await this.reweighs.save(
       this.reweighs.create({
         eventId,
         claimedWeightKg,
@@ -69,5 +71,14 @@ export class ReweighService {
         verifiedAt: new Date(),
       }),
     );
+
+    // Settle any doorstep credit already paid on this event. A no-op for the
+    // B2B path, where no request sits behind the event at all. Deliberately
+    // after the save and outside its transaction: the re-weigh is a fact about
+    // material and must stand on its own, so a reconciliation problem is never
+    // allowed to undo it.
+    await this.wallet.reconcile(eventId, Number(saved.verifiedWeightKg));
+
+    return saved;
   }
 }

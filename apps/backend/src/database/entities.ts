@@ -668,6 +668,20 @@ export class CollectionRequestEntity {
   notes: string | null;
 
   /**
+   * Where the waste actually is, for the collector's map.
+   *
+   * Nullable and additive to `address`, never a replacement for it: browser
+   * geolocation is a permission the requester can refuse, and refusing it must
+   * not block booking a pickup. A collector with only a street address is how
+   * every request worked before these columns existed.
+   */
+  @Column("numeric", { precision: 9, scale: 6, nullable: true, transformer: numericTransformer })
+  latitude: number | null;
+
+  @Column("numeric", { precision: 9, scale: 6, nullable: true, transformer: numericTransformer })
+  longitude: number | null;
+
+  /**
    * `requested -> assigned (optional) -> collected (redemption code issued)
    * -> redeemed`, plus `cancelled` from `requested`/`assigned`. "Collected"
    * is reached only once the linked event has a `verified`/`flagged`
@@ -700,6 +714,29 @@ export class CollectionRequestEntity {
 
   @Column({ type: "timestamptz", nullable: true })
   redeemedAt: Date | null;
+
+  /**
+   * Which weight the wallet credit was actually computed from, recorded at
+   * redemption.
+   *
+   * A doorstep pickup is credited off the collector's scale so the requester
+   * is paid at the gate rather than hours later; the hub may re-weigh the same
+   * material afterwards and disagree. Storing the figure that was used makes
+   * that later comparison possible without re-deriving it from a ledger
+   * description.
+   */
+  @Column("numeric", { precision: 10, scale: 3, nullable: true, transformer: numericTransformer })
+  creditedWeightKg: number | null;
+
+  /**
+   * When the door credit was settled against the hub's re-weigh.
+   *
+   * Also the idempotency guard: a request that has been reconciled once can
+   * never be adjusted again, so a re-run or a second re-weigh cannot double
+   * the correction.
+   */
+  @Column({ type: "timestamptz", nullable: true })
+  reconciledAt: Date | null;
 
   @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;

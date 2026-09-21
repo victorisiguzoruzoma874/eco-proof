@@ -312,12 +312,18 @@ export interface CollectionRequest {
   estimatedWeightKg: string | number | null;
   address: string | null;
   notes: string | null;
+  latitude: string | number | null;
+  longitude: string | number | null;
   status: "requested" | "assigned" | "collected" | "redeemed" | "cancelled";
   assignedCollectorId: string | null;
   eventId: string | null;
   /** Set once fulfilled; render it as a QR code (see `qrcode`'s `toDataURL`). */
   redemptionCode: string | null;
   redeemedAt: string | null;
+  /** The weight the credit was computed from — the hub's, or the collector's at the door. */
+  creditedWeightKg: string | number | null;
+  /** Set once a doorstep credit has been settled against the hub's re-weigh. */
+  reconciledAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -551,6 +557,9 @@ export const requesterApi = {
     estimatedWeightKg?: number;
     address?: string;
     notes?: string;
+    /** Sent only as a complete pair; the backend rejects one without the other. */
+    latitude?: number;
+    longitude?: number;
   }) => requesterRequest<CollectionRequest>("/requests", { method: "POST", body: JSON.stringify(body) }),
   myRequests: () => requesterRequest<CollectionRequest[]>("/requests/mine"),
   getWallet: () => requesterRequest<WalletView>("/wallet"),

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
+  CollectionEventEntity,
   CollectionRequestEntity,
   CreditRateEntity,
   EventReweighEntity,
@@ -18,6 +19,7 @@ import { RequestersModule } from "../requesters/requesters.module";
       WasteWalletEntity,
       WalletTransactionEntity,
       CollectionRequestEntity,
+      CollectionEventEntity,
       EventReweighEntity,
       CreditRateEntity,
       WithdrawalRequestEntity,
