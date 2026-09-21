@@ -1,7 +1,7 @@
 import "reflect-metadata";
-import { config as loadDotenv } from "dotenv";
+import { loadEnvironment } from "./config/load-env";
 
-loadDotenv();
+loadEnvironment();
 
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";

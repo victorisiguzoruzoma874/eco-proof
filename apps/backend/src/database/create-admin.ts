@@ -1,10 +1,10 @@
 import "reflect-metadata";
-import { config as loadDotenv } from "dotenv";
+import { loadEnvironment } from "../config/load-env";
 import { AppDataSource } from "./data-source";
 import { UserEntity } from "./entities";
 import { AuthService } from "../auth/auth.module";
 
-loadDotenv();
+loadEnvironment();
 
 /**
  * Create (or reset) an administrator account.

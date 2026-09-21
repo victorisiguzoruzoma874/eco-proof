@@ -1,10 +1,10 @@
 import "reflect-metadata";
-import { config as loadDotenv } from "dotenv";
+import { loadEnvironment } from "../config/load-env";
 import { DataSource } from "typeorm";
 import { ALL_ENTITIES } from "./entities";
 import { resolvePostgresConnection } from "./postgres-connection";
 
-loadDotenv();
+loadEnvironment();
 
 // Migrations run against the same database, over the same TLS settings, as the
 // app itself — a release step that could not reach a managed Postgres because

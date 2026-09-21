@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { config as loadDotenv } from "dotenv";
+import { loadEnvironment } from "../config/load-env";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DataSource, IsNull } from "typeorm";
@@ -18,7 +18,7 @@ import {
 } from "./entities";
 import { AuthService } from "../auth/auth.module";
 
-loadDotenv();
+loadEnvironment();
 
 type DeviceSecret = Record<string, string>;
 
