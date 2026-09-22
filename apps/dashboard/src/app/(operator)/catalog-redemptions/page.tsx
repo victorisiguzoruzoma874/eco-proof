@@ -99,18 +99,33 @@ const CSS = `
   padding-bottom: 0.25rem;
 }
 
+/*
+ * The figure sits over its caption, not beside it: the caption is several
+ * times wider than a one- or two-digit count, so left-aligning the pair left
+ * the number stranded at the caption's left edge. Centring the tile keeps the
+ * number, the word and the bar on one axis whatever the count grows to.
+ */
+.rdmq-tile {
+  text-align: center;
+}
+
 .rdmq-tile-num {
-  font-family: var(--mono);
+  /* A count is a quantity, not a machine string: the sans with tabular figures,
+     like every other figure in the product. The mono this used to take drew its
+     zero with a dot through it, which reads as a glyph rather than as none. */
+  font-family: var(--sans);
   font-size: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   line-height: 1;
   color: var(--ink);
 }
 
 .rdmq-tile-cap {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 0.625rem;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--ink-faint);
@@ -156,7 +171,8 @@ const CSS = `
 }
 
 .rdmq-tab-count {
-  font-family: var(--mono);
+  /* Same reasoning as .rdmq-tile-num: a count is a quantity. */
+  font-family: var(--sans);
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
@@ -363,7 +379,7 @@ export default async function CatalogRedemptionsPage({
         <PageHeader eyebrow="Fulfilment queue" title="Catalog redemptions" />
         <div className="rdmq-tiles">
           {tiles.map((tile) => (
-            <div key={tile.caption}>
+            <div key={tile.caption} className="rdmq-tile">
               <div className="rdmq-tile-num">{tile.value}</div>
               <div className="rdmq-tile-cap">{tile.caption}</div>
               <div
