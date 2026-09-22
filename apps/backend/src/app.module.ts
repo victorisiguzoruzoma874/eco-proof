@@ -1,10 +1,11 @@
-import { Module } from "@nestjs/common";
+import { Logger, Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { ALL_ENTITIES } from "./database/entities";
 import { isInMemoryMode } from "./database/in-memory-flag";
+import { migrateOnBoot } from "./database/migrate-on-boot";
 import { loadConfig } from "./config/configuration";
 import { AuthModule, JwtAuthGuard } from "./auth/auth.module";
 import { AuthController } from "./auth/auth.controller";
@@ -47,6 +48,7 @@ import { RateLimitGuard } from "./common/rate-limit.guard";
           // Never synchronize: this database is the evidentiary record behind
           // saleable credits, so schema changes go through reviewed migrations.
           synchronize: false,
+          // Run explicitly in dataSourceFactory below, so the outcome is logged.
           migrationsRun: false,
           logging: process.env.TYPEORM_LOGGING === "true",
         };
@@ -68,7 +70,11 @@ import { RateLimitGuard } from "./common/rate-limit.guard";
         if (!options) {
           throw new Error("TypeORM did not provide connection options");
         }
-        return new DataSource(options).initialize();
+        const dataSource = await new DataSource(options).initialize();
+        // Before any module can query: see database/migrate-on-boot.ts.
+        const logger = new Logger("migrations");
+        await migrateOnBoot(dataSource, (message) => logger.log(message));
+        return dataSource;
       },
     }),
     AuthModule,

@@ -509,8 +509,23 @@ the login and ingest rate limits put every client in a single bucket.
 
 ### 4. Migrate
 
-There's no pre-deploy step configured, so run migrations by hand from a shell
-on the service after each deploy that changes the schema:
+Nothing to do: the API applies pending migrations itself at boot, before it
+serves a request (`src/database/migrate-on-boot.ts`). Look for
+`[migrations] applied migrations: …` or `[migrations] schema up to date` in the
+deploy log.
+
+This replaced a manual "run `migration:run:prod` from a shell after each
+deploy" step, which the free plan cannot do — it has no shell and no pre-deploy
+command. Skipping it once put the doorstep release live against a database
+without its columns, and every `collection_requests` query returned 500.
+
+If a migration fails, the boot fails, the health check never passes, and Render
+keeps the previous deploy serving. All pending migrations run in one
+transaction, so the schema is left as it was. Fix the migration and redeploy.
+
+To migrate as a separate step instead (a paid plan's pre-deploy command, or
+several instances that could boot at once), set `MIGRATE_ON_BOOT=false` on the
+service and run:
 
 ```bash
 npm run migration:run:prod -w @proofchain/backend
