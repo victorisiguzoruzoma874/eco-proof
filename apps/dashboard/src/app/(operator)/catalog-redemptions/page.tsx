@@ -194,6 +194,7 @@ const CSS = `
 .rdmq-swatch {
   width: 9px;
   height: 9px;
+  border-radius: 50%;
   flex: none;
 }
 
