@@ -296,7 +296,7 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
         <tbody>
           {materials.map((m) => (
             <tr key={m.code}>
-              <td className="hash">{m.code}</td>
+              <td className="hash nowrap">{m.code}</td>
               <td>
                 <Emoji>{materialEmoji(m.code)}</Emoji> {m.name}
               </td>

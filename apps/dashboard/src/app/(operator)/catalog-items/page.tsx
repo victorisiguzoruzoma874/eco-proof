@@ -604,7 +604,9 @@ const PAGE_CSS = `
   transition: color 140ms ease;
 }
 
-.ci-th[data-align="right"] .ci-sort { justify-content: flex-end; }
+/* On a right-aligned column the arrow leads, so the label ends on the same
+   edge as the figures under it. */
+.ci-th[data-align="right"] .ci-sort { justify-content: flex-start; flex-direction: row-reverse; }
 .ci-sort:hover { color: var(--ink); }
 .ci-sort[data-active="true"] { color: var(--ink); }
 

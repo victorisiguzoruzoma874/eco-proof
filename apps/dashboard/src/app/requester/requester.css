@@ -152,6 +152,10 @@
  */
 .rq-grid {
   display: grid;
+  /* `minmax(0, 1fr)`, not the implicit `auto` track: an auto track grows to a
+     table's full width and pushes the page sideways, where this one holds the
+     column to the screen and lets the table's own wrapper scroll instead. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 
@@ -699,6 +703,11 @@
      it pushes this five-column table past 390px on a phone — and the collision
      it was guarding against was the missing column gutter above, not wrapping. */
 }
+/* An icon and its material label stay one token. */
+.rq-table td:has(> .emoji) {
+  white-space: nowrap;
+}
+
 .rq-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
