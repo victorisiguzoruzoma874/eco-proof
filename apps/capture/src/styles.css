@@ -7,6 +7,9 @@
  */
 
 :root {
+  /* Native controls (select menus, scrollbars, autofill) follow the theme too. */
+  color-scheme: light;
+
   --bone: #f4f2ec;
   /* A sunk bone, for surfaces that are present but not actionable. */
   --bone-sunk: #e6e4dd;
@@ -21,6 +24,13 @@
   --warn: #b8631a;
   --bad: #b3261e;
   --surface: #ffffff;
+  /*
+   * Text on the lime signal. Fixed in both themes: the signal stays lime in the
+   * dark, so its label must stay dark rather than follow --ink to near-white.
+   */
+  --on-signal: #111311;
+  /* The quiet zone round the door QR. Always white — see .qr-code. */
+  --qr-frame: #ffffff;
 
   --space: clamp(0.75rem, 0.5rem + 1.2vw, 1.25rem);
   --touch: 56px;
@@ -74,6 +84,50 @@
     sans-serif;
   --serif: "Fraunces Variable", ui-serif, Georgia, "Iowan Old Style", serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+}
+
+/*
+ * Dark theme: the same instrument inverted, for a hub at night or a phone on
+ * its lowest brightness. Light stays the default because it reads best in
+ * direct sun, which is where this app mostly lives.
+ *
+ * Rules stay near-full strength, as the heavy borders and hard offsets are
+ * what the layout is made of, and the status colours are lifted until they
+ * hold contrast on the dark surface. The signal lime needs no change.
+ *
+ * Declared twice on purpose: once for "follow the system" (no data-theme), and
+ * once for an explicit choice, which wins either way (see lib/theme.ts).
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bone: #121412;
+    --bone-sunk: #272a26;
+    --ink: #eeece5;
+    --ink-soft: #a9ada3;
+    --rule: #d9d6cc;
+    --rule-soft: #353831;
+    --good: #3dbb6e;
+    --warn: #e8913f;
+    --bad: #f0675c;
+    --surface: #1b1e1a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bone: #121412;
+  --bone-sunk: #272a26;
+  --ink: #eeece5;
+  --ink-soft: #a9ada3;
+  --rule: #d9d6cc;
+  --rule-soft: #353831;
+  --good: #3dbb6e;
+  --warn: #e8913f;
+  --bad: #f0675c;
+  --surface: #1b1e1a;
 }
 
 *,
@@ -183,6 +237,42 @@ body {
   background: var(--good);
 }
 
+/* The status and the theme switch share the right-hand end of the masthead. */
+.masthead-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/*
+ * The theme switch. Smaller than the 56px field targets on purpose: it is set
+ * once, not tapped mid-weigh-in, and a full-size button up here would compete
+ * with the weight for attention. 40px is still a comfortable thumb target.
+ */
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 2px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  align-self: center;
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* ---------- layout ---------- */
 
 main {
@@ -274,6 +364,7 @@ main {
   padding: 0.4rem 1rem;
   border: 2px solid var(--rule);
   background: var(--surface);
+  color: var(--ink);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -358,6 +449,7 @@ button.action {
   width: 100%;
   border: 3px solid var(--rule);
   background: var(--signal);
+  color: var(--on-signal);
   font: inherit;
   font-size: var(--text-lg);
   font-weight: 700;
@@ -392,6 +484,7 @@ button.ghost {
   padding: 0 1rem;
   border: 2px solid var(--rule);
   background: var(--surface);
+  color: var(--ink);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -417,6 +510,7 @@ select {
   padding: 0 0.75rem;
   border: 2px solid var(--rule);
   background: var(--surface);
+  color: var(--ink);
   font: inherit;
   border-radius: var(--radius);
 }
@@ -735,8 +829,8 @@ button.ghost.small {
   gap: 0.5rem;
   justify-items: center;
   text-align: center;
-  /* White, not bone: a QR scans off the highest contrast available, and this
-     one is read by a second phone's camera at arm's length. */
+  /* The surface, not bone. The code itself carries its own white frame (see
+     .qr-code), so it scans the same in either theme. */
   background: var(--surface);
   box-shadow: 4px 4px 0 var(--rule);
 }
@@ -746,6 +840,14 @@ button.ghost.small {
   height: auto;
   display: block;
   image-rendering: pixelated;
+  /*
+   * Dark modules on white, in both themes. A QR is read by a second phone's
+   * camera at arm's length, and inverting it, or letting its quiet zone blend
+   * into a dark card, is exactly what makes a scanner give up. The frame widens
+   * the image's own 2-module margin so the edge is unmistakable on dark.
+   */
+  background: var(--qr-frame);
+  padding: 8px;
 }
 
 .door-proof .hint {

@@ -50,6 +50,7 @@ import {
   signWeighIn,
 } from "./lib/identity";
 import * as queue from "./lib/queue";
+import { currentTheme, onSystemThemeChange, toggleTheme, type Theme } from "./lib/theme";
 import QRCode from "qrcode";
 import {
   collectRequest,
@@ -467,6 +468,12 @@ async function render(): Promise<void> {
   app.setAttribute("aria-busy", "false");
   app.innerHTML = markup;
   provisioning ? wireCapture() : wireProvision();
+  // The masthead is on every screen, so the switch is wired here, not per screen.
+  on("theme-toggle", "click", () => {
+    toggleTheme();
+    syncThemeToggle();
+  });
+  syncThemeToggle();
 
   if (carriedWeight) {
     const next = document.getElementById("weight") as HTMLInputElement | null;
@@ -485,8 +492,39 @@ function masthead(): string {
   return `
     <header class="masthead">
       <h1 class="wordmark">ProofChain <span>capture</span></h1>
-      <span class="net" data-online="${online}">${online ? "online" : "offline"}</span>
+      <span class="masthead-end">
+        <span class="net" data-online="${online}">${online ? "online" : "offline"}</span>
+        <button class="theme-toggle" type="button" id="theme-toggle" aria-label="${themeToggleLabel(currentTheme())}">${themeToggleIcon(currentTheme())}</button>
+      </span>
     </header>`;
+}
+
+const SUN_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
+const MOON_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>`;
+
+/**
+ * The switch shows where it goes, not where you are: a moon in light, a sun in
+ * dark. The label says the same in words for a screen reader.
+ */
+function themeToggleIcon(theme: Theme): string {
+  return theme === "dark" ? SUN_ICON : MOON_ICON;
+}
+
+function themeToggleLabel(theme: Theme): string {
+  return `Switch to ${theme === "dark" ? "light" : "dark"} theme`;
+}
+
+/**
+ * Refresh just the switch's face. A full `render()` would do, but it rebuilds
+ * the whole screen for the sake of one icon and would drop an open camera or a
+ * half-typed field for nothing.
+ */
+function syncThemeToggle(): void {
+  const button = document.getElementById("theme-toggle");
+  if (!button) return;
+  const theme = currentTheme();
+  button.innerHTML = themeToggleIcon(theme);
+  button.setAttribute("aria-label", themeToggleLabel(theme));
 }
 
 function noticeHtml(): string {
@@ -1499,6 +1537,10 @@ setInterval(() => {
 setInterval(() => {
   void pollJobs();
 }, 45_000);
+
+// A phone set to follow the system's dark mode changes at dusk; keep the
+// switch's icon honest when that happens and no explicit choice overrides it.
+onSystemThemeChange(syncThemeToggle);
 
 void queue.pruneSynced();
 void render();

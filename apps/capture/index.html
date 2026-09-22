@@ -7,6 +7,18 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
     />
     <meta name="theme-color" content="#111311" />
+    <!--
+      Apply a stored theme before first paint, so a phone set to dark does not
+      flash light on every launch. Mirrors readStoredTheme in src/lib/theme.ts
+      (same key); with no stored choice it does nothing and the stylesheet
+      follows the system.
+    -->
+    <script>
+      try {
+        var t = localStorage.getItem("proofchain.capture.theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <meta
       name="description"
       content="ProofChain field capture — signed, geo-tagged, offline-first weigh-ins."
