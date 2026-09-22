@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { CreditRate, HubDirectoryEntry, Material } from "@/lib/api";
 import { formatNaira, materialEmoji } from "@/lib/format";
 import { Emoji } from "@/app/Emoji";
+import { currentDefaultRates } from "@/lib/rates";
 
 const STEP_KG = 0.5;
 
@@ -88,16 +89,14 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
     );
   }
 
-  // Global default rates only (hubId: null) — same simplification as the
-  // "Today's rates" table on /requester/dashboard: a hub-specific override
-  // may exist, but this is meant as a quick estimate, not a locked-in quote.
-  const rateByMaterial = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const rate of rates) {
-      if (rate.hubId === null) map.set(rate.materialCode, Number(rate.creditsPerKg));
-    }
-    return map;
-  }, [rates]);
+  // The rate in effect now for each material, global default only: a quick
+  // estimate, not a locked-in quote. Picking by date matters: the API lists
+  // every rate ever set, newest first, so taking whichever came last in the
+  // list quoted the oldest rate.
+  const rateByMaterial = useMemo(
+    () => new Map(currentDefaultRates(rates).map((r) => [r.materialCode, Number(r.creditsPerKg)])),
+    [rates],
+  );
 
   function adjust(code: string, delta: number) {
     setWeights((prev) => {

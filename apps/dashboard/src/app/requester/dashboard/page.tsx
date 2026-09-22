@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { formatDateTime, formatKg, formatNaira, materialEmoji } from "@/lib/format";
 import { Emoji } from "@/app/Emoji";
+import { currentDefaultRates } from "@/lib/rates";
 import { ScanButton } from "../wallet/ScanButton";
 
 export const dynamic = "force-dynamic";
@@ -120,10 +121,9 @@ export default async function RequesterDashboardPage({
 
   const hubNameById = new Map(hubs.map((h) => [h.id, `${h.name} (${h.code})`]));
 
-  // Global default rates only (hubId: null) — a hub-specific override still
-  // exists in the data, but "today's rates" here is meant as a quick,
-  // simple-to-scan reference, not the exact figure for every hub.
-  const defaultRates = creditRates.filter((r) => r.hubId === null);
+  // One row per material: the rate in effect now. The API returns the whole
+  // history, so filtering alone listed every material once per rate change.
+  const defaultRates = currentDefaultRates(creditRates);
 
   // Rendered server side via the `qrcode` package's toDataURL, embedded as a
   // data: URI — no client-side QR library, matching this dashboard's
