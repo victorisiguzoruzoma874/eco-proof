@@ -37,13 +37,13 @@ export default async function RequesterWelcomePage() {
 
       <ol className="rq-steps">
         <li>
-          <strong>01</strong> — Request a pickup from your gate. No fee.
+          <strong>01</strong> Request a pickup from your gate. No fee.
         </li>
         <li>
-          <strong>02</strong> — The collector weighs each material in front of you.
+          <strong>02</strong> The collector weighs each material in front of you.
         </li>
         <li>
-          <strong>03</strong> — Credits land in your wallet. Cash out or spend with partners.
+          <strong>03</strong> Credits land in your wallet. Cash out or spend with partners.
         </li>
       </ol>
 

@@ -228,7 +228,7 @@ export default async function RequesterDashboardPage({
           <h2>Ready to redeem</h2>
           <p className="rq-note">
             Collected and hub-verified. Redeem the code below for waste credits from{" "}
-            <Link href="/requester/wallet">your wallet</Link> — scan the QR or type the code
+            <Link href="/requester/wallet">your wallet</Link>. Scan the QR or type the code
             printed underneath.
           </p>
           <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(13rem, 1fr))" }}>

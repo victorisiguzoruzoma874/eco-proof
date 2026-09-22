@@ -92,8 +92,7 @@ export default async function EventsPage({
                 <th>Integrity</th>
                 <th>Failed checks</th>
                 <th>Batch</th>
-                <th className="no-print">Proof</th>
-                <th className="no-print">Reweigh</th>
+                <th className="no-print col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -132,22 +131,18 @@ export default async function EventsPage({
                         shortHash(null)
                       )}
                     </td>
-                    <td className="no-print">
+                    <td className="no-print col-actions">
                       {e.quarantined ? (
                         "—"
                       ) : (
-                        <Link className="btn" href={`/events/${e.id}/proof`}>
-                          Proof
-                        </Link>
-                      )}
-                    </td>
-                    <td className="no-print">
-                      {e.quarantined ? (
-                        "—"
-                      ) : (
-                        <Link className="btn" href={`/reweigh?eventId=${e.id}`}>
-                          Reweigh
-                        </Link>
+                        <div className="actions">
+                          <Link className="btn" href={`/events/${e.id}/proof`}>
+                            Proof
+                          </Link>
+                          <Link className="btn" href={`/reweigh?eventId=${e.id}`}>
+                            Reweigh
+                          </Link>
+                        </div>
                       )}
                     </td>
                   </tr>

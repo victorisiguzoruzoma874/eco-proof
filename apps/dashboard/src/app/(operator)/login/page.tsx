@@ -87,7 +87,7 @@ export default async function LoginPage({
 
       <p className="note" style={{ marginTop: "1.5rem" }}>
         Auditors get read-only access. Verification endpoints and audit reports stay public by
-        design — a buyer must be able to check our claims without an account.
+        design, because a buyer must be able to check our claims without an account.
       </p>
     </main>
   );

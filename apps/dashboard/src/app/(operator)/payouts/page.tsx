@@ -149,7 +149,7 @@ export default async function PayoutsPage({
                 <th>Reference</th>
                 <th>Created</th>
                 <th>Paid</th>
-                {canEdit ? <th className="no-print">Actions</th> : null}
+                {canEdit ? <th className="no-print col-actions">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -176,14 +176,14 @@ export default async function PayoutsPage({
                   <td className="meta">{formatDateTime(p.createdAt)}</td>
                   <td className="meta">{formatDateTime(p.paidAt)}</td>
                   {canEdit ? (
-                    <td className="no-print">
+                    <td className="no-print col-actions">
                       {p.status === "pending" ? (
                         <details className="confirm">
                           <summary className="btn">Mark paid</summary>
                           <form action={markPaidAction} className="confirm-body">
                             <input type="hidden" name="id" value={p.id} />
                             <label htmlFor={`ref-${p.id}`}>
-                              Payout reference (optional) — receipt or transfer id
+                              Payout reference (optional, receipt or transfer id)
                               <input id={`ref-${p.id}`} name="payoutRef" maxLength={200} />
                             </label>
                             <div className="actions">
@@ -211,7 +211,7 @@ export default async function PayoutsPage({
           <p className="note">
             Covers one or more <Link href="/reweigh">recorded reweighs</Link> for a single
             collector. Each reweigh must belong to that collector, not already be attached to
-            another payout, and a rate must exist for its material — otherwise the request is
+            another payout, and a rate must exist for its material, otherwise the request is
             refused and the reason is shown below.
           </p>
           <form action={createPayoutAction} className="confirm-body">
@@ -229,7 +229,7 @@ export default async function PayoutsPage({
               </select>
             </label>
             <label htmlFor="eventReweighIds">
-              Reweigh ids — comma or space separated
+              Reweigh ids (comma or space separated)
               <input
                 id="eventReweighIds"
                 name="eventReweighIds"

@@ -67,8 +67,8 @@ export function describeLoadError(error: unknown, resource: string): LoadErrorIn
     return {
       kind: "server",
       title: "The server could not complete the request",
-      message: `${capitalise(resource)} could not be loaded. This is an error on the server, not a connection problem — retrying is worth one attempt.`,
-      detail: error.detail ? `${error.status} — ${error.detail}` : `${error.message} (${error.status})`,
+      message: `${capitalise(resource)} could not be loaded. This is an error on the server, not a connection problem, so retrying is worth one attempt.`,
+      detail: error.detail ? `${error.status}: ${error.detail}` : `${error.message} (${error.status})`,
       retryable: true,
     };
   }
@@ -99,7 +99,7 @@ function detailOfThrown(error: unknown): string | undefined {
   const cause = (error as { cause?: unknown }).cause;
   if (cause instanceof Error) {
     const code = (cause as { code?: unknown }).code;
-    return typeof code === "string" ? `${error.message} — ${code}` : `${error.message} — ${cause.message}`;
+    return typeof code === "string" ? `${error.message}: ${code}` : `${error.message}: ${cause.message}`;
   }
   return error.message;
 }

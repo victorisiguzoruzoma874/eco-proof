@@ -109,7 +109,7 @@ export default async function MaterialRatesPage({
       <p className="page-intro">
           A rate is per kg, per material, optionally overridden per hub. A payout looks up the
           most specific rate that applies (hub-specific over global default, most recent{" "}
-          <code>effectiveFrom</code> at or before now) — it never takes a manual amount per item.
+          <code>effectiveFrom</code> at or before now). It never takes a manual amount per item.
         </p>
 
       {error ? <p className="error">{decodeURIComponent(error)}</p> : null}
@@ -179,7 +179,7 @@ export default async function MaterialRatesPage({
               </select>
             </label>
             <label htmlFor="hubId">
-              Hub override (optional) — leave blank for the global default
+              Hub override (optional, leave blank for the global default)
               <select id="hubId" name="hubId" defaultValue="">
                 <option value="">Global default (all hubs)</option>
                 {hubs.map((h) => (
@@ -202,7 +202,7 @@ export default async function MaterialRatesPage({
               />
             </label>
             <label htmlFor="effectiveFrom">
-              Effective from (optional) — defaults to now
+              Effective from (optional, defaults to now)
               <input id="effectiveFrom" name="effectiveFrom" type="datetime-local" />
             </label>
             <div className="actions">

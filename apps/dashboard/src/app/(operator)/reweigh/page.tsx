@@ -101,7 +101,7 @@ export default async function ReweighPage({
           Enter the lookup code from the collector&rsquo;s proof page (or the full weigh-in id, found
           on the <Link href="/events">weigh-ins list</Link>) to look up what was claimed, then
           record what the hub scale actually reads. Within ±5% of the claim is recorded as verified;
-          outside that is flagged and needs a note — either way the collector is paid the
+          outside that is flagged and needs a note. Either way the collector is paid the
           hub-verified weight.
         </p>
 
@@ -205,7 +205,7 @@ export default async function ReweighPage({
                 </dl>
               </div>
               <p className="note">
-                One reweigh per weigh-in — this one is done. Once verified, it becomes eligible
+                One reweigh per weigh-in, and this one is done. Once verified, it becomes eligible
                 for a <Link href="/payouts">payout</Link>.
               </p>
             </>
@@ -215,7 +215,7 @@ export default async function ReweighPage({
               <form action={submitReweigh} className="confirm-body" style={{ maxWidth: "36rem" }}>
                 <input type="hidden" name="eventId" value={event.id} />
                 <label htmlFor="verifiedWeightKg">
-                  Verified weight (kg) — what the hub scale reads
+                  Verified weight in kg (what the hub scale reads)
                   <input
                     id="verifiedWeightKg"
                     name="verifiedWeightKg"
@@ -226,7 +226,7 @@ export default async function ReweighPage({
                   />
                 </label>
                 <label htmlFor="notes">
-                  Notes — required if the weight differs from the claim by more than 5%
+                  Notes (required if the weight differs from the claim by more than 5%)
                   <input id="notes" name="notes" maxLength={500} placeholder="e.g. wet material" />
                 </label>
                 <div className="actions">

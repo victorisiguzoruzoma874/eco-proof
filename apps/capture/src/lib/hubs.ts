@@ -38,16 +38,21 @@ export interface HubAssignment {
 }
 
 /**
- * "NBO-01 — Nairobi Pilot Hub", without saying it twice.
+ * "NBO-01 (Nairobi Pilot Hub)", without saying it twice.
  *
  * Provisioning stores `hubName` as the whole label, so a synthesised option that
- * fed it as both code and name rendered "NBO-01 — Nairobi Pilot Hub — NBO-01 —
- * Nairobi Pilot Hub" on the collector's screen.
+ * fed it as both code and name rendered "NBO-01 (Nairobi Pilot Hub) (NBO-01
+ * (Nairobi Pilot Hub))" on the collector's screen.
+ *
+ * A phone provisioned before this label changed shape still holds the old
+ * "CODE — Name" string. It keeps rendering as-is (the prefix check below
+ * catches it) and is rewritten to the new shape by the next hub-directory
+ * sync, so nothing has to be migrated by hand.
  */
 export function hubLabel(hub: Pick<HubOption, "code" | "name">): string {
   const code = hub.code.trim();
   if (!code || hub.name.trim().startsWith(code)) return hub.name;
-  return `${code} — ${hub.name}`;
+  return `${code} (${hub.name})`;
 }
 
 /**

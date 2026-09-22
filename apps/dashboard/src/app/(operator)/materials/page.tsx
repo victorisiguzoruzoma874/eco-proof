@@ -172,9 +172,9 @@ export default async function MaterialsPage({
       <p className="page-intro">
           A material <strong>code</strong> is signed into every weigh-in payload and hashed into the
           Merkle root anchored on the ledger. It can never be renamed or deleted once a collector has
-          signed it — doing so would invalidate the audit report of every batch containing it. The{" "}
+          signed it, and doing so would invalidate the audit report of every batch containing it. The{" "}
           <strong>name</strong>, the field guidance and the <strong>products</strong> list are
-          presentation only and safe to change at any time — the products are what the capture apps
+          presentation only and safe to change at any time. The products are what the capture apps
           show a collector so they can tell what a code covers without knowing the resin names.
           Retiring a material hides it from the capture apps and leaves every stored weigh-in
           untouched.
@@ -225,11 +225,11 @@ export default async function MaterialsPage({
           <h2>Add a material</h2>
           <form action={addMaterial} className="confirm-body">
             <label htmlFor="code">
-              Code — permanent, uppercase, 2–16 characters
+              Code (permanent, uppercase, 2 to 16 characters)
               <input id="code" name="code" required maxLength={16} placeholder="PVC" />
             </label>
             <label htmlFor="name">
-              Name — what collectors read, editable later
+              Name (what collectors read, editable later)
               <input
                 id="name"
                 name="name"
@@ -248,7 +248,7 @@ export default async function MaterialsPage({
               />
             </label>
             <label htmlFor="examples">
-              Products (optional) — what collectors see, comma separated
+              Products (optional, what collectors see, comma separated)
               <input
                 id="examples"
                 name="examples"
@@ -290,7 +290,7 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
             <th>Products</th>
             <th className="num">Order</th>
             <th>Status</th>
-            {canEdit ? <th className="no-print">Actions</th> : null}
+            {canEdit ? <th className="no-print col-actions">Actions</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -302,13 +302,17 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
               </td>
               <td>{m.description ?? "—"}</td>
               <td>
-                {m.examples.length === 0
-                  ? "—"
-                  : m.examples.map((example) => (
+                {m.examples.length === 0 ? (
+                  "—"
+                ) : (
+                  <span className="pill-list">
+                    {m.examples.map((example) => (
                       <span key={example} className="pill" data-tone="neutral">
                         {example}
                       </span>
                     ))}
+                  </span>
+                )}
               </td>
               <td className="num">{m.sortOrder}</td>
               <td>
@@ -317,7 +321,7 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
                 </span>
               </td>
               {canEdit ? (
-                <td className="no-print">
+                <td className="no-print col-actions">
                   <div className="actions">
                     <form action={setActive}>
                       <input type="hidden" name="code" value={m.code} />
@@ -332,7 +336,7 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
                       <form action={editMaterial} className="confirm-body">
                         <input type="hidden" name="code" value={m.code} />
                         <p>
-                          The code <strong>{m.code}</strong> cannot change — it is already signed
+                          The code <strong>{m.code}</strong> cannot change, because it is already signed
                           into payloads. Only what people read changes here.
                         </p>
                         <label htmlFor={`name-${m.code}`}>
@@ -355,7 +359,7 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
                           />
                         </label>
                         <label htmlFor={`examples-${m.code}`}>
-                          Products — comma separated, empty to clear
+                          Products (comma separated, empty to clear)
                           <input
                             id={`examples-${m.code}`}
                             name="examples"
@@ -377,7 +381,7 @@ function MaterialTable({ materials, canEdit }: { materials: Material[]; canEdit:
                         <p>
                           Deleting only works if <strong>{m.code}</strong> has never been used by a
                           weigh-in or a batch. If it has, the request is refused and you will be
-                          told how many records carry it — retire it instead, which is almost always
+                          told how many records carry it. Retire it instead, which is almost always
                           what you want.
                         </p>
                         <div className="actions">

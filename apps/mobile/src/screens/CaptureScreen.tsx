@@ -107,7 +107,7 @@ export function CaptureScreen({ identity, device, onCaptured }: Props) {
   const rangeHint = useMemo(() => {
     if (bounds.minKg === null && bounds.maxKg === null) return null;
     if (bounds.minKg !== null && bounds.maxKg !== null) {
-      return `This hub accepts ${formatKg(bounds.minKg)}–${formatKg(bounds.maxKg)} kg per weigh-in.`;
+      return `This hub accepts ${formatKg(bounds.minKg)} to ${formatKg(bounds.maxKg)} kg per weigh-in.`;
     }
     return bounds.maxKg !== null
       ? `This hub accepts up to ${formatKg(bounds.maxKg)} kg per weigh-in.`
@@ -179,7 +179,7 @@ export function CaptureScreen({ identity, device, onCaptured }: Props) {
       <View style={styles.permission}>
         <Text style={styles.permissionTitle}>Camera access needed</Text>
         <Text style={styles.permissionBody}>
-          Every weigh-in is photographed. The photo stays on this phone — only its
+          Every weigh-in is photographed. The photo stays on this phone, and only its
           fingerprint is sent.
         </Text>
         <Pressable style={styles.primary} onPress={requestPermission}>

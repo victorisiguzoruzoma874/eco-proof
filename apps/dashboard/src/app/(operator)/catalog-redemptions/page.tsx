@@ -197,18 +197,6 @@ const CSS = `
   flex: none;
 }
 
-.rdmq-table thead th {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--ink-soft);
-  background: var(--surface);
-  padding: 0.7rem 1rem;
-  border-bottom: 1.5px solid var(--rule-strong);
-}
-
 .rdmq-table tbody tr {
   animation: row-in 380ms both cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -389,7 +377,7 @@ export default async function CatalogRedemptionsPage({
       <p className="page-intro">
         Every catalog redemption a requester has made from{" "}
         <Link href="/catalog-items">Catalog items</Link>. The wallet debit already happened at
-        redemption time — mark fulfilled once the item has actually been handed over or sent.
+        redemption time. Mark fulfilled once the item has actually been handed over or sent.
       </p>
 
       {error ? <p className="error">{decodeURIComponent(error)}</p> : null}
@@ -441,7 +429,7 @@ export default async function CatalogRedemptionsPage({
                 <th className="num">Cost</th>
                 <th>Requested</th>
                 <th>Status</th>
-                {canEdit ? <th className="no-print">Actions</th> : null}
+                {canEdit ? <th className="no-print col-actions">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -485,7 +473,7 @@ export default async function CatalogRedemptionsPage({
                       ) : null}
                     </td>
                     {canEdit ? (
-                      <td className="no-print">
+                      <td className="no-print col-actions">
                         {r.status === "pending_fulfillment" ? (
                           <details className="confirm">
                             <summary className="btn">Mark fulfilled</summary>

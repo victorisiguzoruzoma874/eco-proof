@@ -158,7 +158,7 @@ export default async function RequesterHistoryPage() {
                     </span>
                   </td>
                   <td className="num">
-                    {t.type === "credit" ? "+" : "-"}
+                    {t.type === "credit" ? "+" : "−"}
                     {Number(t.amountCredits).toLocaleString()} credits
                   </td>
                   <td>{t.description ?? "—"}</td>

@@ -29,7 +29,7 @@ import { INTEGRITY_CHECKS, type IntegrityCheck } from "./types.js";
 
 const COLLECTOR_COPY: Record<IntegrityCheck, string> = {
   signature_valid:
-    "This phone's signing key was not accepted. Ask an operator to re-enrol it — weigh-ins captured until then will not count.",
+    "This phone's signing key was not accepted. Ask an operator to re-enrol it. Weigh-ins captured until then will not count.",
   device_enrolled:
     "This phone is not enrolled to capture for this collector. Ask an operator to enrol it again.",
   weight_in_range:
@@ -137,10 +137,10 @@ export function weightProblem(weightKg: number, bounds: HubWeightBounds): string
   if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
 
   if (bounds.maxKg !== null && weightKg > bounds.maxKg) {
-    return `Too heavy for this hub — the limit is ${formatKg(bounds.maxKg)} kg for one weigh-in. Split the load and weigh it in parts.`;
+    return `Too heavy for this hub. The limit is ${formatKg(bounds.maxKg)} kg for one weigh-in. Split the load and weigh it in parts.`;
   }
   if (bounds.minKg !== null && weightKg < bounds.minKg) {
-    return `Too light for this hub — the minimum is ${formatKg(bounds.minKg)} kg for one weigh-in.`;
+    return `Too light for this hub. The minimum is ${formatKg(bounds.minKg)} kg for one weigh-in.`;
   }
   return null;
 }

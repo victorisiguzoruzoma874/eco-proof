@@ -960,6 +960,72 @@ th.num {
 }
 
 /*
+ * The row's own controls. Shrink-wrapped to its buttons and pinned to the right
+ * edge, head included, so every ledger ends on the same line and the popover
+ * (anchored `right: 0`) opens back over the row instead of off the page.
+ */
+th.col-actions,
+td.col-actions {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+td.col-actions .actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+/* The cell's `nowrap` is for its buttons, not for the prose in its popover. */
+td.col-actions .confirm-body {
+  white-space: normal;
+}
+
+/* A button in a row is one size everywhere: tall enough to hit, short enough
+   that a row with a control is the same height as a row without one. The
+   popover's own buttons keep the full size. */
+tbody td .btn {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+}
+
+tbody td .confirm-body .btn {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+}
+
+/* Several pills in one cell, with air between them, wrapping as a group. */
+.pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/*
+ * A two-column key/value table (Merkle root, hub, ids). The label column is a
+ * fixed width so the values start on one edge across stacked tables on the
+ * same page, and it has no minimum width: two columns fit a phone as they are.
+ */
+.table--kv {
+  min-width: 0;
+}
+
+.table--kv tbody th {
+  width: 12rem;
+}
+
+.table--kv tbody tr:last-child th {
+  border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .table--kv tbody th {
+    width: 7.5rem;
+    white-space: normal;
+  }
+}
+
+/*
  * Icons in a cell sit in a fixed 24×24 box. An emoji's advance width varies
  * by glyph and platform, so without this the word after it starts at a
  * slightly different x on every row and the column looks ragged.

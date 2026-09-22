@@ -147,8 +147,8 @@ export default async function RequesterWalletPage({
           {redeemed === "true" ? "Your balance above has been updated." : redeemed}
         </p>
       ) : null}
-      {withdrawn ? <p className="rq-note">Withdrawal requested — it is held pending payout below.</p> : null}
-      {itemRedeemed ? <p className="rq-note">Item redeemed — awaiting fulfillment.</p> : null}
+      {withdrawn ? <p className="rq-note">Withdrawal requested. It is held pending payout below.</p> : null}
+      {itemRedeemed ? <p className="rq-note">Item redeemed. Awaiting fulfillment.</p> : null}
 
       <div className="rq-grid">
       <section className="rq-section">
@@ -189,7 +189,7 @@ export default async function RequesterWalletPage({
         <h2>Request a withdrawal</h2>
         <p style={{ color: "var(--rq-text-soft)", marginBottom: "0.75rem" }}>
           1 credit = ₦1. A withdrawal is held as <code>pending</code> until an operator confirms
-          the payout has actually been sent — it is not deducted from your balance above until
+          the payout has actually been sent. It is not deducted from your balance above until
           then, but it is no longer available to request again while held.
         </p>
         <form action={withdrawAction}>

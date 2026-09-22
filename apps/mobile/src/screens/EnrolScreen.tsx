@@ -158,7 +158,7 @@ export function EnrolScreen({ identity, onEnrolled }: Props) {
           <Options items={collectors.map((c) => ({ id: c.id, text: c.name }))} selected={collectorId} onSelect={setCollectorId} />
 
           <Text style={styles.label}>HUB</Text>
-          <Options items={hubs.map((h) => ({ id: h.id, text: `${h.code} — ${h.name}` }))} selected={hubId} onSelect={setHubId} />
+          <Options items={hubs.map((h) => ({ id: h.id, text: `${h.code} (${h.name})` }))} selected={hubId} onSelect={setHubId} />
 
           <Field label="PHONE LABEL" value={label} onChange={setLabel} placeholder="field phone 1" />
 

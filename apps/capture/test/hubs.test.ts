@@ -30,21 +30,21 @@ const HUBS = [NAIROBI, LAGOS];
 
 describe("hubLabel", () => {
   it("reads as the operator wrote it", () => {
-    expect(hubLabel(LAGOS)).toBe("LAG-01 — Lagos Pilot Hub");
+    expect(hubLabel(LAGOS)).toBe("LAG-01 (Lagos Pilot Hub)");
   });
 
   it("does not repeat a name that already carries its code", () => {
-    // Provisioning stores hubName as "CODE — Name", so a synthesised option fed
+    // Provisioning stores hubName as "CODE (Name)", so a synthesised option fed
     // both halves the same string once rendered as
-    // "NBO-01 — Nairobi Pilot Hub — NBO-01 — Nairobi Pilot Hub".
-    expect(hubLabel({ code: "", name: "NBO-01 — Nairobi Pilot Hub" })).toBe(
-      "NBO-01 — Nairobi Pilot Hub",
+    // "NBO-01 (Nairobi Pilot Hub) (NBO-01 (Nairobi Pilot Hub))".
+    expect(hubLabel({ code: "", name: "NBO-01 (Nairobi Pilot Hub)" })).toBe(
+      "NBO-01 (Nairobi Pilot Hub)",
     );
   });
 
   it("does not prefix a code the name already starts with", () => {
-    expect(hubLabel({ code: "NBO-01", name: "NBO-01 — Nairobi Pilot Hub" })).toBe(
-      "NBO-01 — Nairobi Pilot Hub",
+    expect(hubLabel({ code: "NBO-01", name: "NBO-01 (Nairobi Pilot Hub)" })).toBe(
+      "NBO-01 (Nairobi Pilot Hub)",
     );
   });
 });
@@ -55,7 +55,7 @@ describe("selectHub", () => {
 
     expect(assignment).toEqual({
       hubId: "hub-los",
-      hubName: "LAG-01 — Lagos Pilot Hub",
+      hubName: "LAG-01 (Lagos Pilot Hub)",
     });
   });
 
@@ -71,7 +71,7 @@ describe("selectHub", () => {
 describe("hubChoices", () => {
   const current = {
     hubId: "hub-nbo",
-    hubName: "NBO-01 — Nairobi Pilot Hub",
+    hubName: "NBO-01 (Nairobi Pilot Hub)",
   };
 
   it("offers the snapshot when it holds the assigned hub", () => {
@@ -102,7 +102,7 @@ describe("hubChoices", () => {
 describe("mergeHubSnapshot", () => {
   const current = {
     hubId: "hub-nbo",
-    hubName: "NBO-01 — Nairobi Pilot Hub",
+    hubName: "NBO-01 (Nairobi Pilot Hub)",
   };
 
   it("adopts a freshly fetched directory", () => {
@@ -119,7 +119,7 @@ describe("mergeHubSnapshot", () => {
 
     const merged = mergeHubSnapshot(renamed, current);
 
-    expect(merged.assignment).toMatchObject({ hubName: "NBO-01 — Nairobi Central Hub" });
+    expect(merged.assignment).toMatchObject({ hubName: "NBO-01 (Nairobi Central Hub)" });
   });
 
   it("leaves the assignment alone when nothing about the hub changed", () => {

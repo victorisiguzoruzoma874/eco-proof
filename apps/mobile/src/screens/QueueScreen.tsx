@@ -101,7 +101,7 @@ function ProofBanner({ proof }: { proof: Proof }) {
       </Text>
       <Text style={styles.proofHint}>
         Lookup code for this weigh-in. The full printable proof is on the
-        dashboard — give this code to whoever verifies the drop-off.
+        dashboard. Give this code to whoever verifies the drop-off.
       </Text>
     </View>
   );

@@ -88,7 +88,7 @@ export default async function RequesterRewardsPage({
       </p>
 
       {error ? <p className="rq-error">{decodeURIComponent(error)}</p> : null}
-      {redeemed ? <p className="rq-note">Item redeemed &mdash; awaiting fulfillment.</p> : null}
+      {redeemed ? <p className="rq-note">Item redeemed. Awaiting fulfillment.</p> : null}
 
       {catalogItems.length === 0 ? (
         <p className="rq-note">Nothing in the catalog right now.</p>

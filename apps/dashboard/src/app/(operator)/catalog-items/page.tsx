@@ -242,7 +242,7 @@ export default async function CatalogItemsPage({
 
         <p className="page-intro">
           The catalogue is what a requester can spend waste credits on instead of cashing out via{" "}
-          <Link href="/withdrawals">Withdrawals</Link> — airtime, discounts, physical goods. Prices
+          <Link href="/withdrawals">Withdrawals</Link>: airtime, discounts, physical goods. Prices
           are held in credits at a flat 1 credit = &#8358;1. Redeeming debits the requester&rsquo;s
           wallet immediately and queues the item on{" "}
           <Link href="/catalog-redemptions">Catalog redemptions</Link> for an operator to fulfil, so
@@ -363,9 +363,11 @@ export default async function CatalogItemsPage({
                           <span className="ci-unlimited">unlimited</span>
                         ) : low ? (
                           <span className="ci-low" title="Low stock">
-                            {item.stock}
+                            {/* Dot first: after the digits it would push this
+                                row's figure off the column's right edge. */}
                             <span className="ci-pulse" aria-hidden="true" />
-                            <span className="ci-visually-hidden"> — low stock</span>
+                            {item.stock}
+                            <span className="ci-visually-hidden">, low stock</span>
                           </span>
                         ) : (
                           item.stock
@@ -404,7 +406,7 @@ export default async function CatalogItemsPage({
         <section id="add-an-item" className="ci-add">
           <h2>Add an item</h2>
           <p className="note">
-            Items can only be added, never edited or retired — the backend exposes no update route,
+            Items can only be added, never edited or retired, because the backend exposes no update route,
             so a price published here is the price a requester pays.
           </p>
           <form action={addItem} className="ci-form">
@@ -426,7 +428,7 @@ export default async function CatalogItemsPage({
               <input id="category" name="category" required maxLength={50} placeholder="airtime" />
             </label>
             <label htmlFor="costCredits">
-              Cost (credits) — 1 credit = ₦1
+              Cost in credits (1 credit = ₦1)
               <input
                 id="costCredits"
                 name="costCredits"
@@ -438,7 +440,7 @@ export default async function CatalogItemsPage({
               />
             </label>
             <label htmlFor="stock">
-              Stock (optional) — leave blank for unlimited
+              Stock (optional, leave blank for unlimited)
               <input id="stock" name="stock" type="number" min="0" placeholder="100" />
             </label>
             <div className="actions ci-form-actions">
@@ -574,42 +576,29 @@ const PAGE_CSS = `
 
 /* ---------- table ---------- */
 
+/* The same frame, head and cell rhythm as every other ledger (globals.css
+   "tables"): only the sort links and the footer are this page's own. */
 .ci-shell {
   border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
   background: var(--surface);
+  overflow: hidden;
 }
 
 .ci-scroll { overflow-x: auto; }
 
-.ci-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-  min-width: 46rem;
-}
+.ci-table { min-width: 46rem; }
 
-.ci-table thead tr { background: var(--surface); }
-
-.ci-table th.ci-th {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 500;
-  color: var(--ink-faint);
-  background: var(--surface);
-  border-bottom: 1.5px solid var(--rule-strong);
-  padding: 0;
-  white-space: nowrap;
-}
+/* The link carries the padding so the whole head cell is the hit target. */
+.ci-table th.ci-th { padding: 0; }
 
 .ci-th[data-align="right"] { text-align: right; }
 
 .ci-sort {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.7rem 1rem;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
   color: inherit;
   text-decoration: none;
   transition: color 140ms ease;
@@ -624,17 +613,6 @@ const PAGE_CSS = `
 .ci-arrow { font-size: 0.7rem; opacity: 0.3; line-height: 1; }
 .ci-sort:hover .ci-arrow { opacity: 0.6; }
 .ci-sort[data-active="true"] .ci-arrow { opacity: 1; color: var(--accent); }
-
-.ci-table td {
-  padding: 0.8125rem 1rem;
-  border-bottom: 1px solid var(--rule);
-  vertical-align: baseline;
-}
-
-.ci-table tbody tr:last-child td { border-bottom: 0; }
-
-.ci-table tbody tr { transition: background-color 120ms ease; }
-.ci-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
 
 .ci-row { animation: row-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 

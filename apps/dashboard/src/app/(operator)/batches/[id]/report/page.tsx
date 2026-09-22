@@ -31,7 +31,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         ? "No batch exists with this identifier."
         : status === 401 || status === 403
           ? "This report is not publicly readable. Sign in as an operator to view it."
-          : "The reporting service could not be reached. This says nothing about the validity of the batch — try again shortly.";
+          : "The reporting service could not be reached. This says nothing about the validity of the batch, so try again shortly.";
 
     return (
       <main>
@@ -126,7 +126,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           {proofState === "verified"
             ? "Sealed and internally consistent"
             : proofState === "broken"
-              ? "INCONSISTENT — do not rely on this batch"
+              ? "INCONSISTENT: do not rely on this batch"
               : "Not sealed"}
         </h3>
         <dl>
@@ -149,10 +149,10 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       <h2>Collection hub</h2>
       <div className="table-wrap">
-        <table>
+        <table className="table--kv">
           <tbody>
             <tr>
-              <th style={{ width: "12rem" }}>Hub</th>
+              <th>Hub</th>
               <td>
                 {report.hub.name} ({report.hub.code})
               </td>
@@ -429,7 +429,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         style={{ marginTop: "2rem", borderTop: "1px solid var(--rule)", paddingTop: "1rem" }}
       >
         To verify independently: recompute each leaf as sha256(0x00 ‖ payloadHash) and combine
-        pairs as sha256(0x01 ‖ left ‖ right) in the stated order — the result should match the
+        pairs as sha256(0x01 ‖ left ‖ right) in the stated order. The result should match the
         sealed root above. The full event list, including every payload hash, is available as CSV
         and JSON without an account.
       </p>

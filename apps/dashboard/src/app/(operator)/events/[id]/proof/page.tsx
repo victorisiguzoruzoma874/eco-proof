@@ -34,7 +34,7 @@ export default async function EventProofPage({ params }: { params: Promise<{ id:
         ? "No weigh-in exists with this identifier."
         : status === 401 || status === 403
           ? "This proof is not publicly readable. Sign in as an operator to view it."
-          : "The lookup service could not be reached. This says nothing about the validity of the weigh-in — try again shortly.";
+          : "The lookup service could not be reached. This says nothing about the validity of the weigh-in, so try again shortly.";
 
     return (
       <main>
@@ -71,7 +71,7 @@ export default async function EventProofPage({ params }: { params: Promise<{ id:
       </div>
 
       <p className="note no-print">
-        Print this page (Ctrl/Cmd+P → Save as PDF), or simply keep it on this screen — either way,
+        Print this page (Ctrl/Cmd+P → Save as PDF), or simply keep it on this screen. Either way,
         bring it to the verification hub.
       </p>
 
@@ -120,10 +120,10 @@ export default async function EventProofPage({ params }: { params: Promise<{ id:
       </dl>
 
       <div className="table-wrap" style={{ marginTop: "1.5rem" }}>
-        <table>
+        <table className="table--kv">
           <tbody>
             <tr>
-              <th style={{ width: "12rem" }}>Collector id</th>
+              <th>Collector id</th>
               <td className="hash">{event.collectorId}</td>
             </tr>
             <tr>

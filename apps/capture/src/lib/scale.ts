@@ -60,7 +60,7 @@ export async function connectScale(
   onReading: (reading: ScaleReading) => void,
 ): Promise<ScaleConnection> {
   if (!isSupported()) {
-    throw new Error("this browser does not support Web Bluetooth — use manual entry");
+    throw new Error("this browser does not support Web Bluetooth. Use manual entry");
   }
 
   const bluetooth = (navigator as Navigator & { bluetooth: any }).bluetooth;

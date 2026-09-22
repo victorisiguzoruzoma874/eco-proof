@@ -144,7 +144,7 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
                       </p>
                     ) : null}
                     <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", color: "var(--rq-text-faint)" }}>
-                      {rate !== undefined ? `${rate.toLocaleString()} credits/kg` : "— no published rate"}
+                      {rate !== undefined ? `${rate.toLocaleString()} credits/kg` : "No published rate"}
                     </p>
                   </div>
                   <div className="rq-stepper">
@@ -218,14 +218,14 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
             </select>
           </label>
           <label className="rq-field" htmlFor="address">
-            Address (optional) — where the material can be picked up from
+            Address (optional, where the material can be picked up from)
             <input id="address" name="address" maxLength={500} placeholder="Street and landmark" />
           </label>
           <div className="rq-field">
             <span>Pickup location (optional)</span>
             <p style={{ margin: "0 0 0.5rem", fontSize: "0.8125rem", color: "var(--rq-text-soft)" }}>
               {coords
-                ? `Pin shared — your collector will get directions straight to you.`
+                ? `Pin shared. Your collector will get directions straight to you.`
                 : "Share a pin so your collector can navigate to you instead of hunting for the address."}
             </p>
             <button

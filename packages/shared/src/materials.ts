@@ -133,7 +133,7 @@ export const SEED_MATERIALS: readonly Material[] = [
   {
     code: "MIXED",
     name: "Mixed plastic",
-    description: "Unsorted or unidentifiable plastic. Lowest credit value — sort where possible.",
+    description: "Unsorted or unidentifiable plastic. Lowest credit value, so sort where possible.",
     examples: [
       "Multi-layer sachets",
       "Unmarked offcuts",

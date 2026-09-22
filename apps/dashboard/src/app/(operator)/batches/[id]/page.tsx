@@ -142,7 +142,7 @@ export default async function BatchPage({
 
       {batch.status === "open" ? (
         <p className="note no-print">
-          Sealing freezes membership and computes the Merkle root. It cannot be undone — events
+          Sealing freezes membership and computes the Merkle root. It cannot be undone, and events
           cannot be added or removed afterwards, which is exactly what makes the root worth
           relying on.
         </p>
@@ -179,10 +179,10 @@ export default async function BatchPage({
       </dl>
 
       <div className="table-wrap">
-        <table>
+        <table className="table--kv">
           <tbody>
             <tr>
-              <th style={{ width: "12rem" }}>Merkle root</th>
+              <th>Merkle root</th>
               <td className="hash">
                 {batch.merkleRoot ?? "not computed until the batch is sealed"}
               </td>

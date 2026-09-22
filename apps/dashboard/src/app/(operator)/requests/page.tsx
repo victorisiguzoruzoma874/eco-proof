@@ -172,7 +172,7 @@ export default async function RequestsPage({
         }
       />
       <p className="page-intro">
-        Fulfilling links a request to an already hub-verified weigh-in — enter its lookup code or
+        Fulfilling links a request to an already hub-verified weigh-in. Enter its lookup code or
         full id, same as <Link href="/reweigh">Reweigh</Link>. Only a <code>verified</code> or{" "}
         <code>flagged</code> reweigh (never <code>rejected</code>, and never a bare unverified
         weigh-in) is eligible.
@@ -180,7 +180,7 @@ export default async function RequestsPage({
 
       {error ? <p className="error">{decodeURIComponent(error)}</p> : null}
       {assigned ? <p className="note">Assigned.</p> : null}
-      {fulfilled ? <p className="note">Fulfilled — redemption code issued.</p> : null}
+      {fulfilled ? <p className="note">Fulfilled. Redemption code issued.</p> : null}
       {cancelled ? <p className="note">Cancelled.</p> : null}
 
       <dl className="stats">
@@ -225,7 +225,7 @@ export default async function RequestsPage({
                 <th>Status</th>
                 <th>Collector</th>
                 <th>Requested</th>
-                {canEdit ? <th className="no-print">Actions</th> : null}
+                {canEdit ? <th className="no-print col-actions">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -250,7 +250,7 @@ export default async function RequestsPage({
                   </td>
                   <td className="meta">{formatDateTime(r.createdAt)}</td>
                   {canEdit ? (
-                    <td className="no-print">
+                    <td className="no-print col-actions">
                       <div className="actions">
                         {r.status === "requested" ? (
                           <details className="confirm">
@@ -342,7 +342,7 @@ export default async function RequestsPage({
           <h2>Redemption codes</h2>
           <p className="note">
             Collected and awaiting redemption. Print or show one of these to the requester if they
-            aren&rsquo;t signed in to their own dashboard — the same code and QR appear on{" "}
+            aren&rsquo;t signed in to their own dashboard. The same code and QR appear on{" "}
             <code>/requester/dashboard</code> once they are.
           </p>
           <div

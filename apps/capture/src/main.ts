@@ -264,7 +264,7 @@ function reportUnexpected(id: string, error: unknown): void {
  * from a stale catalogue is choosing from something that can be rejected later.
  */
 function catalogueStatus(): string {
-  if (isUsingFallbackCatalogue()) return "default list — not yet synced";
+  if (isUsingFallbackCatalogue()) return "default list, not yet synced";
 
   const fetchedAt = catalogueFetchedAt();
   if (!fetchedAt) return "";
@@ -768,7 +768,7 @@ function rangeHint(p: Provisioning): string {
 
   const range =
     minKg !== null && maxKg !== null
-      ? `${formatKg(minKg)}–${formatKg(maxKg)} kg`
+      ? `${formatKg(minKg)} to ${formatKg(maxKg)} kg`
       : minKg !== null
         ? `${formatKg(minKg)} kg or more`
         : `up to ${formatKg(maxKg as number)} kg`;
@@ -864,7 +864,7 @@ async function captureScreen(): Promise<string> {
                   const parts = [m.description, examplesLine(m.examples, m.examples.length)].filter(
                     (part): part is string => Boolean(part),
                   );
-                  return parts.length > 0 ? `title="${escapeHtml(parts.join(" — "))}"` : "";
+                  return parts.length > 0 ? `title="${escapeHtml(parts.join(", "))}"` : "";
                 })()}
               ><span>${escapeHtml(m.name)}</span>${sub}</button>`;
             })
@@ -894,7 +894,7 @@ async function captureScreen(): Promise<string> {
         <span class="tally" data-kind="rejected"><b>${tallies.rejected}</b>rejected</span>
       </div>
       <button class="ghost" id="sync" ${navigator.onLine ? "" : "disabled"}>
-        ${navigator.onLine ? "Sync now" : "Offline — will sync automatically"}
+        ${navigator.onLine ? "Sync now" : "Offline, will sync automatically"}
       </button>
       <ul class="records">
         ${
@@ -943,7 +943,7 @@ function savePairing(input: {
     hubId: input.hub.id,
     deviceId: input.deviceId,
     collectorName: input.collectorName,
-    hubName: `${input.hub.code} — ${input.hub.name}`,
+    hubName: `${input.hub.code} (${input.hub.name})`,
     // Snapshot every hub while an operator token is still in hand: this is
     // the only moment the device can see the list, and it is what lets a
     // collector move between sites later without signal or a login.
@@ -1023,7 +1023,7 @@ function wireProvision(): void {
 
       const hubSelect = $<HTMLSelectElement>("hub");
       hubSelect.innerHTML = hubs
-        .map((h) => `<option value="${h.id}">${escapeHtml(`${h.code} — ${h.name}`)}</option>`)
+        .map((h) => `<option value="${h.id}">${escapeHtml(`${h.code} (${h.name})`)}</option>`)
         .join("");
 
       $("assign").hidden = false;
@@ -1032,7 +1032,7 @@ function wireProvision(): void {
             tone: "warn",
             text: "This phone's previous key was revoked, so it has made a new one. Choose the collector and hub to enrol it.",
           }
-        : { tone: "good", text: "Signed in. This phone is new — choose the collector and hub to enrol it." };
+        : { tone: "good", text: "Signed in. This phone is new, so choose the collector and hub to enrol it." };
       const current = document.querySelector(".notice");
       if (current) current.outerHTML = noticeHtml();
     } catch (error) {
@@ -1135,7 +1135,7 @@ function wireCapture(): void {
       // Whatever was captured before survives; this attempt simply did not land.
       photoSlot = {
         busy: false,
-        message: describeError(error, "could not read that photo — try again"),
+        message: describeError(error, "could not read that photo, try again"),
         tone: "bad",
       };
     } finally {
@@ -1402,7 +1402,7 @@ async function commitDoorstep(
   if (!navigator.onLine) {
     notice = {
       tone: "bad",
-      text: "No connection. A pickup needs a signal to issue the customer's code — move and retry, or clear the pickup to queue this weigh-in instead.",
+      text: "No connection. A pickup needs a signal to issue the customer's code. Move and retry, or clear the pickup to queue this weigh-in instead.",
     };
     await render();
     return false;

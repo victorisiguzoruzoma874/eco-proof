@@ -168,7 +168,7 @@ export default async function WithdrawalsPage({
 
       <p className="page-intro">
         1 credit = ₦1. A withdrawal is only ever debited from a requester&rsquo;s wallet once marked
-        paid here — recording it any earlier would risk showing a debit for cash the requester never
+        paid here, because recording it any earlier would risk showing a debit for cash the requester never
         actually received.
       </p>
 
@@ -237,7 +237,7 @@ export default async function WithdrawalsPage({
                 <th>Payout reference</th>
                 <th>Requested</th>
                 <th>Paid</th>
-                {canEdit ? <th className="no-print">Actions</th> : null}
+                {canEdit ? <th className="no-print col-actions">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -276,18 +276,18 @@ export default async function WithdrawalsPage({
                   {canEdit ? (
                     <td
                       data-label=""
-                      className={`no-print${w.status === "pending" ? "" : " is-empty"}`}
+                      className={`no-print col-actions${w.status === "pending" ? "" : " is-empty"}`}
                     >
                       {w.status === "pending" ? (
                         <div className="actions">
                           <details className="confirm">
-                            <summary className="btn" data-variant="primary" data-size="sm">
+                            <summary className="btn" data-variant="primary">
                               Mark paid
                             </summary>
                             <form action={markPaidAction} className="confirm-body">
                               <input type="hidden" name="id" value={w.id} />
                               <label htmlFor={`ref-${w.id}`}>
-                                Payout reference (optional) — receipt or transfer id
+                                Payout reference (optional, receipt or transfer id)
                                 <input id={`ref-${w.id}`} name="payoutRef" maxLength={200} />
                               </label>
                               <p>
@@ -303,7 +303,7 @@ export default async function WithdrawalsPage({
                           </details>
 
                           <details className="confirm">
-                            <summary className="btn" data-size="sm">
+                            <summary className="btn">
                               Reject
                             </summary>
                             <form action={rejectAction} className="confirm-body">
