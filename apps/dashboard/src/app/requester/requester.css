@@ -680,7 +680,7 @@
 .rq-table td {
   text-align: left;
   vertical-align: middle;
-  padding: 0.75rem 1.25rem 0.75rem 0;
+  padding: 1rem 1.5rem 1rem 0;
   border-top: 1px solid var(--rq-divider);
   line-height: 1.45;
 }
@@ -692,7 +692,7 @@
 .rq-table thead th {
   border-top: 0;
   padding-top: 0;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.625rem;
   vertical-align: bottom;
   font-size: var(--text-2xs);
   letter-spacing: 0.04em;
@@ -703,8 +703,30 @@
      it pushes this five-column table past 390px on a phone — and the collision
      it was guarding against was the missing column gutter above, not wrapping. */
 }
+/* The header's own row needs a firmer line under it than the hairlines
+   between body rows — it is the one border in the table that is a boundary,
+   not a divider — so it is thicker and drawn on the row beneath instead of
+   relying on that row's own (identical, so invisible as an emphasis) hairline. */
+.rq-table thead tr {
+  border-bottom: 1px solid var(--rq-divider);
+}
+.rq-table tbody tr:first-child td {
+  border-top: 0;
+}
+
 /* An icon and its material label stay one token. */
 .rq-table td:has(> .emoji) {
+  white-space: nowrap;
+}
+
+/*
+ * A timestamp reads as one unit — date, comma, time — and wrapping it after
+ * the comma is what was making every row a different height, so the pill and
+ * the weight beside it landed at a different baseline row to row. Nowrap here
+ * (like the material and numeric cells already have) is what actually holds
+ * the row grid; the table's `overflow-x: auto` wrapper absorbs the width.
+ */
+.rq-table td:last-child {
   white-space: nowrap;
 }
 
