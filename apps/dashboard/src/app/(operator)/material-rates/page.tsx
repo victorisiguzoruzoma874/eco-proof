@@ -164,7 +164,7 @@ export default async function MaterialRatesPage({
       {canCreate ? (
         <>
           <h2>Add a rate</h2>
-          <form action={addRate} className="confirm-body">
+          <form action={addRate} className="page-form">
             <label htmlFor="materialCode">
               Material
               <select id="materialCode" name="materialCode" required defaultValue="">
