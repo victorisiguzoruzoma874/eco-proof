@@ -1378,6 +1378,33 @@ tbody tr:hover {
   color: var(--ink-soft);
 }
 
+/*
+ * A form that belongs to the page, not a popover.
+ *
+ * `.confirm-body` is absolutely positioned against its row so it can drop down
+ * over a table. Reused for a page-level form, it pinned itself to the far edge
+ * of the shell, ran off the screen, and left a hole where it should have been.
+ * This is the same card, in the flow: set against the right edge of the
+ * content (flush with the table above it) at a little over half its width, so
+ * a short form does not stretch fields across the whole ledger.
+ */
+.page-form {
+  width: 56%;
+  margin: var(--space-4) 0 var(--space-8) auto;
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (max-width: 760px) {
+  .page-form {
+    width: 100%;
+  }
+}
+
 .actions {
   display: flex;
   gap: var(--space-2);

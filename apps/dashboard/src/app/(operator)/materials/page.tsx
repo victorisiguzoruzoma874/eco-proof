@@ -223,7 +223,7 @@ export default async function MaterialsPage({
       {canEdit ? (
         <>
           <h2>Add a material</h2>
-          <form action={addMaterial} className="confirm-body">
+          <form action={addMaterial} className="page-form">
             <label htmlFor="code">
               Code (permanent, uppercase, 2 to 16 characters)
               <input id="code" name="code" required maxLength={16} placeholder="PVC" />
