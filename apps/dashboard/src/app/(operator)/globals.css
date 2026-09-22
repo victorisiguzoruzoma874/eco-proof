@@ -1041,6 +1041,19 @@ td .emoji {
   margin-right: var(--space-1);
 }
 
+/* An icon and the label it illustrates are one token: squeezed, the label
+   used to drop onto a line of its own under the icon. */
+td:has(> .emoji) {
+  white-space: nowrap;
+}
+
+/* For a cell whose value is one short word that must not break (a material
+   code) even though `.hash` lets long digests break anywhere. */
+td.nowrap {
+  white-space: nowrap;
+  word-break: normal;
+}
+
 tbody tr:last-child td {
   border-bottom: 0;
 }
@@ -1389,20 +1402,14 @@ tbody tr:hover {
  * a short form does not stretch fields across the whole ledger.
  */
 .page-form {
-  width: 56%;
-  margin: var(--space-4) 0 var(--space-8) auto;
+  width: 100%;
+  margin: var(--space-4) 0 var(--space-8);
   padding: var(--space-6);
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
   display: grid;
   gap: var(--space-4);
-}
-
-@media (max-width: 760px) {
-  .page-form {
-    width: 100%;
-  }
 }
 
 .actions {
@@ -1725,6 +1732,26 @@ label {
     --ink-faint: #555;
     --rule: #bbb;
     --rule-strong: #000;
+
+    /*
+     * The state tints belong here for the same reason as the surfaces above.
+     * Resetting only the grounds left the verification banner printing its dark
+     * tint — near-black text on a near-black panel — whenever the reader's
+     * machine was in dark mode, which is precisely the case this block exists
+     * to defend against. Light tints, ink-dark text, so a badge and the banner
+     * both survive a monochrome printer.
+     */
+    --verified: #1c3c2b;
+    --verified-bg: #eaf1ec;
+    --pending: #5c430a;
+    --pending-bg: #f6efdf;
+    --broken: #7d3c1c;
+    --broken-bg: #f3e8df;
+
+    --accent: #1c3c2b;
+    --accent-bg: #eaf1ec;
+    --accent-deep: #142c1f;
+    --on-accent: #fff;
   }
 
   .topbar,
