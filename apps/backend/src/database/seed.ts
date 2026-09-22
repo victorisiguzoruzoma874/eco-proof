@@ -314,7 +314,10 @@ export async function seedDevelopmentData(dataSource: DataSource): Promise<void>
   }
 
   // A small starter catalogue so the redemption path has something to
-  // redeem against in dev/demo. Plausible placeholders, priced in whole
+  // redeem against in dev/demo. Names carry no price: both screens that
+  // render an item already print its cost beside it, and a price baked into
+  // a name is a second copy that nothing keeps in step with `costCredits`.
+  // Plausible placeholders, priced in whole
   // credits (= whole Naira, given the 1:1 peg) — real items/pricing go in
   // via POST /catalog-items, same "idempotent, seed it if missing" pattern
   // as everything else in this file.
@@ -326,7 +329,7 @@ export async function seedDevelopmentData(dataSource: DataSource): Promise<void>
     stock: number | null;
   }> = [
     {
-      name: "₦100 Airtime Top-up",
+      name: "Airtime Top-up",
       description: "Airtime credit for any major Nigerian network, sent to the requester's phone.",
       category: "airtime",
       costCredits: 100,
