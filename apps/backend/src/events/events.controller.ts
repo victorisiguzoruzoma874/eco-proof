@@ -24,7 +24,7 @@ export class EventsController {
   @Post()
   @ApiOperation({ summary: "Submit a signed weigh-in from a collector device" })
   submit(@Body() dto: SubmitWeighInDto) {
-    return this.events.ingest(dto.payload, dto.signature);
+    return this.events.ingest(dto.payload, dto.signature, dto.claimCode);
   }
 
   @Get()

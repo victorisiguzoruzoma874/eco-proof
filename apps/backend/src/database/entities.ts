@@ -837,6 +837,69 @@ export class WalletTransactionEntity {
 }
 
 /**
+ * The claim ticket for a walk-in weigh-in.
+ *
+ * A doorstep pickup is credited through its collection request, which already
+ * names the requester who booked it. A walk-in has no booking: someone brings a
+ * sack to a collector, it is weighed on the capture screen, and the phone shows
+ * a QR that whoever scans it first is credited for. This row is that QR's
+ * server-side half.
+ *
+ * The code is minted on the phone, not here, because capture works offline and
+ * the customer is standing there now. The phone sends it alongside the weigh-in
+ * when it syncs and only its SHA-256 is kept: the events API is public, so the
+ * code must not be derivable from anything stored on or served about the event.
+ * It is a bearer token (whoever holds it can claim) and is treated like one.
+ *
+ * Kept out of `collection_events` on purpose: that table is the evidentiary
+ * record and is never updated after ingest, while a claim changes state.
+ *
+ * `creditedWeightKg` / `reconciledAt` mirror the same pair on
+ * `CollectionRequestEntity`: which weight the credit was computed from, and
+ * when the hub's later re-weigh settled any difference.
+ */
+@Entity("weighin_claims")
+export class WeighInClaimEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  /** One claim per weigh-in, ever. */
+  @Index({ unique: true })
+  @Column("uuid")
+  eventId: string;
+
+  @ManyToOne(() => CollectionEventEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "eventId" })
+  event: CollectionEventEntity;
+
+  /** SHA-256 hex of the normalised code. Unique: the lookup key on redemption. */
+  @Index({ unique: true })
+  @Column({ type: "varchar", length: 64 })
+  claimCodeHash: string;
+
+  /** Who claimed it; null until someone does. */
+  @Index()
+  @Column({ type: "uuid", nullable: true })
+  requesterId: string | null;
+
+  @ManyToOne(() => RequesterEntity, { onDelete: "RESTRICT", nullable: true })
+  @JoinColumn({ name: "requesterId" })
+  requester: RequesterEntity | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  claimedAt: Date | null;
+
+  @Column("numeric", { precision: 10, scale: 3, nullable: true, transformer: numericTransformer })
+  creditedWeightKg: number | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  reconciledAt: Date | null;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+}
+
+/**
  * A requester's cash-out request against their wallet — mirrors
  * `PayoutEntity`'s `pending -> paid` pattern exactly, on purpose (see that
  * entity's doc comment): a debit is only ever written to
@@ -1061,4 +1124,5 @@ export const ALL_ENTITIES = [
   CreditRateEntity,
   CatalogItemEntity,
   CatalogRedemptionEntity,
+  WeighInClaimEntity,
 ];

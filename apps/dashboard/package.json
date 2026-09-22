@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "barcode-detector": "^3.2.2",
     "next": "^15.1.4",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",

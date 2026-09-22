@@ -32,14 +32,17 @@ async function redeemAction(formData: FormData) {
 
   const redemptionCode = String(formData.get("redemptionCode") ?? "").trim();
 
+  let description = "";
   try {
-    await requesterApi.redeemCode(redemptionCode);
+    const result = await requesterApi.redeemCode(redemptionCode);
+    description = result.transaction.description ?? "";
   } catch (error) {
     redirect(`/requester/wallet?error=${encodeURIComponent(messageOf(error))}`);
   }
 
   revalidatePath("/requester/wallet");
-  redirect("/requester/wallet?redeemed=true");
+  revalidatePath("/requester/dashboard");
+  redirect(`/requester/wallet?redeemed=${encodeURIComponent(description || "true")}`);
 }
 
 /**
@@ -140,8 +143,8 @@ export default async function RequesterWalletPage({
       {error ? <p className="rq-error">{decodeURIComponent(error)}</p> : null}
       {redeemed ? (
         <p className="rq-note">
-          <strong>Credited!</strong> That code&rsquo;s hub-verified weight has been added to your
-          balance above.
+          <strong>Credited!</strong>{" "}
+          {redeemed === "true" ? "Your balance above has been updated." : redeemed}
         </p>
       ) : null}
       {withdrawn ? <p className="rq-note">Withdrawal requested — it is held pending payout below.</p> : null}
@@ -151,12 +154,13 @@ export default async function RequesterWalletPage({
       <section className="rq-section">
         <h2>Redeem a code</h2>
         <p style={{ color: "var(--rq-text-soft)", marginBottom: "0.75rem" }}>
-          Scan the QR your collector shows you at the door — or type the code printed under it —
-          to credit the weight they collected to your wallet. Each code redeems once.
+          Scan the QR your collector shows you, at your door or at the scale when you drop
+          material off, or type the code printed under it, to credit the weight to your wallet.
+          Each code redeems once.
         </p>
-        {/* Renders nothing where BarcodeDetector is unavailable, leaving the
-            typed-code path below as the only one. See ScanButton. */}
-        <ScanButton />
+        {/* Renders nothing only where there is no camera API at all, leaving
+            the typed-code path below. See ScanButton. */}
+        <ScanButton autoSubmit />
         <form action={redeemAction}>
           <label className="rq-field" htmlFor="redemptionCode">
             Redemption code

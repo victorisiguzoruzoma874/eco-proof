@@ -15,6 +15,7 @@ import {
   CollectorEntity,
   EventReweighEntity,
   HubEntity,
+  WeighInClaimEntity,
 } from "../database/entities";
 import { MaterialsService } from "../materials/materials.service";
 import { EventsService } from "../events/events.service";
@@ -315,6 +316,17 @@ export class RequestsService {
     const alreadyLinked = await this.requests.findOne({ where: { eventId } });
     if (alreadyLinked) {
       throw new ConflictException(`event ${eventId} is already linked to request ${alreadyLinked.id}`);
+    }
+
+    // The other half of "one weigh-in, one credit" (see WalletService.claimWalkIn):
+    // a walk-in someone has already scanned and been paid for cannot be paid
+    // again through a pickup.
+    const claimed = await this.events.manager.findOne(WeighInClaimEntity, {
+      where: { eventId },
+      select: { claimedAt: true },
+    });
+    if (claimed?.claimedAt) {
+      throw new ConflictException(`event ${eventId} was a walk-in already claimed from the capture screen`);
     }
 
     const reweigh = await this.reweighs.findOne({ where: { eventId } });

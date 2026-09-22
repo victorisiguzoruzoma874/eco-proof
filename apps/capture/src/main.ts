@@ -50,6 +50,7 @@ import {
   signWeighIn,
 } from "./lib/identity";
 import * as queue from "./lib/queue";
+import { formatClaimCode, generateClaimCode } from "./lib/claim";
 import { currentTheme, onSystemThemeChange, toggleTheme, type Theme } from "./lib/theme";
 import QRCode from "qrcode";
 import {
@@ -135,7 +136,14 @@ let notice: { tone: "good" | "bad" | "warn"; text: string } | null = null;
  * it is meant to stay on screen until the collector has had a chance to note it
  * down or move on to the next sack.
  */
-let lastProof: { lookupCode: string; weightKg: number } | null = null;
+let lastProof: {
+  lookupCode: string;
+  weightKg: number;
+  material: string;
+  /** The walk-in claim code and its QR, when this weigh-in has one. */
+  claimCode: string | null;
+  qrDataUrl: string | null;
+} | null = null;
 
 /**
  * The pickup requests dispatched to this collector, and which one is being
@@ -533,26 +541,70 @@ function noticeHtml(): string {
 }
 
 /**
- * The post-commit confirmation: "Weigh-in queued" plus its lookup code.
+ * The post-commit card: the walk-in QR for the customer, plus the lookup code.
  *
- * A separate card rather than folding into `notice` — the lookup code is
- * something a collector may want to copy down or photograph, not a one-line
- * status that scrolls away with the next message. It survives on screen across
- * re-renders (the queue tallies below tick up, a sync completes) until the next
- * commit replaces it, and it never blocks capturing the next weigh-in.
+ * The QR comes first because the customer is standing at the scale: they scan
+ * it in their ProofChain wallet and are credited for this weigh-in. The code
+ * is printed under it at full size for when a camera will not focus. The
+ * lookup code stays, smaller, for whoever verifies the drop-off later.
+ *
+ * It survives re-renders (the tallies tick up, a sync completes) until the
+ * collector dismisses it or the next weigh-in replaces it, and it never blocks
+ * capturing the next sack. A dismissed QR can be brought back from its row in
+ * the queue below, so tapping Done too early does not cost anyone their credit.
  */
 function proofCardHtml(): string {
   if (!lastProof) return "";
-  return `
+  const { weightKg, material, claimCode, qrDataUrl, lookupCode } = lastProof;
+  const kg = escapeHtml(weightKg.toFixed(3));
+
+  if (!claimCode || !qrDataUrl) {
+    return `
       <div class="proof" role="status">
-        <span class="label">Weigh-in queued · ${escapeHtml(lastProof.weightKg.toFixed(3))} kg</span>
-        <span class="proof-code">${escapeHtml(lastProof.lookupCode)}</span>
+        <span class="label">Weigh-in queued · ${kg} kg</span>
+        <span class="proof-code">${escapeHtml(lookupCode)}</span>
         <p class="hint">
-          Lookup code for this weigh-in. The full printable proof — with photo and
-          collector details — is on the dashboard once this hub can view it; give
-          this code to whoever verifies the drop-off.
+          Lookup code for this weigh-in. Give it to whoever verifies the drop-off.
         </p>
+        <button class="ghost small" type="button" id="dismiss-proof">Done</button>
       </div>`;
+  }
+
+  const shown = formatClaimCode(claimCode);
+  return `
+      <div class="door-proof" role="status">
+        <span class="label">Scan to claim · ${kg} kg ${escapeHtml(materialLabel(material, cachedCatalogue()))}</span>
+        <img class="qr-code" src="${escapeHtml(qrDataUrl)}" alt="QR code for claim code ${escapeHtml(shown)}" />
+        <span class="proof-code">${escapeHtml(shown)}</span>
+        <p class="hint">
+          Show this to the customer. They scan it in their ProofChain wallet to be
+          credited for ${kg} kg; the first scan claims it. If the scan will not
+          work, they can type the code instead.
+        </p>
+        <p class="hint">Lookup code <span class="record-code">${escapeHtml(lookupCode)}</span></p>
+        <button class="ghost small" type="button" id="dismiss-proof">Done</button>
+      </div>`;
+}
+
+/** A QR for a claim code, as a data URI. Same settings as the door QR. */
+function claimQr(claimCode: string): Promise<string> {
+  return QRCode.toDataURL(claimCode, { errorCorrectionLevel: "M", margin: 2, width: 320 });
+}
+
+/** Put a queued weigh-in's claim QR back on screen. */
+async function showClaim(recordId: string): Promise<void> {
+  const record = (await queue.all()).find((r) => r.id === recordId);
+  if (!record?.claimCode) return;
+
+  lastProof = {
+    lookupCode: computeEventPayloadHash(record.payload).slice(0, 10),
+    weightKg: record.payload.weightKg,
+    material: record.payload.material,
+    claimCode: record.claimCode,
+    qrDataUrl: await claimQr(record.claimCode),
+  };
+  await render();
+  document.querySelector(".door-proof")?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 /**
@@ -858,7 +910,9 @@ async function captureScreen(): Promise<string> {
             ${
               r.status === "rejected"
                 ? `<button class="ghost small record-discard" type="button" data-discard="${r.id}">Discard</button>`
-                : ""
+                : r.claimCode
+                  ? `<button class="ghost small record-discard" type="button" data-show-claim="${r.id}">Show QR</button>`
+                  : ""
             }
           </li>`,
                 )
@@ -1134,6 +1188,17 @@ function wireCapture(): void {
       void discardItem(btn.dataset.discard!).catch((error) => reportUnexpected("discard", error));
     });
   }
+
+  for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-show-claim]")) {
+    btn.addEventListener("click", () => {
+      void showClaim(btn.dataset.showClaim!).catch((error) => reportUnexpected("show claim", error));
+    });
+  }
+
+  on("dismiss-proof", "click", () => {
+    lastProof = null;
+    void render();
+  });
 }
 
 // ---------------------------------------------------------------- actions
@@ -1268,10 +1333,14 @@ async function commit(): Promise<void> {
     const completed = await commitDoorstep(payload, signature, weightInput);
     if (!completed) return; // the failure is already on screen; keep the evidence
   } else {
+    // Minted before anything is stored, so the QR and the queued record can
+    // never disagree about the code.
+    const claimCode = generateClaimCode();
     await queue.enqueue({
       id: randomId(),
       payload,
       signature,
+      claimCode,
       photo,
       status: "queued",
       attempts: 0,
@@ -1286,7 +1355,15 @@ async function commit(): Promise<void> {
     lastProof = {
       lookupCode: computeEventPayloadHash(payload).slice(0, 10),
       weightKg: payload.weightKg,
+      material: payload.material,
+      claimCode,
+      qrDataUrl: await claimQr(claimCode),
     };
+
+    // The customer is about to scan, and the claim only resolves once the
+    // server has this weigh-in. Send it now rather than at the next 60 s drain;
+    // offline, it waits in the queue and the wallet says to try again shortly.
+    void runSync();
   }
 
   // Reset only the per-weigh-in evidence; keep material, since the next sack is

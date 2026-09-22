@@ -14,6 +14,7 @@ import {
   MaterialEntity,
   PayoutEntity,
   PayoutItemEntity,
+  WeighInClaimEntity,
 } from "../../src/database/entities";
 
 /**
@@ -72,6 +73,7 @@ export function buildEventsService(dataSource: DataSource): EventsService {
     dataSource.getRepository(CollectorEntity),
     dataSource.getRepository(HubEntity),
     buildMaterialsService(dataSource),
+    dataSource.getRepository(WeighInClaimEntity),
   );
 }
 

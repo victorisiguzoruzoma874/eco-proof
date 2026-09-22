@@ -182,7 +182,13 @@ async function postWeighIn(record: queue.QueuedWeighIn): Promise<IngestResponse>
     const res = await fetch(`${backendUrl()}/events`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ payload: record.payload, signature: record.signature }),
+      // The claim code rides alongside the signed payload, not inside it: it
+      // is a claim ticket, not evidence (see the backend's SubmitWeighInDto).
+      body: JSON.stringify({
+        payload: record.payload,
+        signature: record.signature,
+        ...(record.claimCode ? { claimCode: record.claimCode } : {}),
+      }),
       signal: controller.signal,
     });
 

@@ -31,6 +31,12 @@ export interface QueuedWeighIn {
    * waiting for enough bandwidth to send.
    */
   photoUploadedAt: string | null;
+  /**
+   * The walk-in claim code shown as a QR after this weigh-in (see lib/claim.ts),
+   * sent with it on sync. Optional: records queued before walk-in claims
+   * existed have none, and they simply sync without one.
+   */
+  claimCode?: string | null;
 }
 
 const DB_NAME = "proofchain-capture";

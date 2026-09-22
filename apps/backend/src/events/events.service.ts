@@ -11,7 +11,9 @@ import {
   CollectorEntity,
   DeviceEntity,
   HubEntity,
+  WeighInClaimEntity,
 } from "../database/entities";
+import { hashClaimCode } from "../wallet/claim-code";
 import { evaluateIntegrity } from "./integrity";
 import { loadConfig } from "../config/configuration";
 import { MaterialsService } from "../materials/materials.service";
@@ -42,6 +44,8 @@ export class EventsService {
     @InjectRepository(HubEntity)
     private readonly hubs: Repository<HubEntity>,
     private readonly materials: MaterialsService,
+    @InjectRepository(WeighInClaimEntity)
+    private readonly claims: Repository<WeighInClaimEntity>,
   ) {}
 
   /**
@@ -52,7 +56,7 @@ export class EventsService {
    * throwing them away would destroy the evidence that the system is working.
    * They simply can never enter a batch.
    */
-  async ingest(payload: WeighInPayload, signature: string): Promise<IngestResult> {
+  async ingest(payload: WeighInPayload, signature: string, claimCode?: string): Promise<IngestResult> {
     if (payload.schema !== "proofchain.weighin.v2") {
       throw new BadRequestException(`unsupported payload schema: ${payload.schema}`);
     }
@@ -98,6 +102,10 @@ export class EventsService {
 
     // A replay is not a new fact. Report the original rather than storing a copy.
     if (existing) {
+      // But do record its claim ticket: the likeliest replay is the same phone
+      // retrying after a response was lost, possibly after the event was saved
+      // and before its claim was.
+      if (claimCode) await this.recordClaim(existing.id, claimCode);
       return {
         eventId: existing.id,
         payloadHash,
@@ -146,6 +154,7 @@ export class EventsService {
               .join(", "),
         );
       }
+      if (claimCode) await this.recordClaim(saved.id, claimCode);
       return { eventId: saved.id, payloadHash, quarantined, integrity, duplicate: false };
     } catch (error) {
       // Two devices syncing the same queued event concurrently race here; the
@@ -163,6 +172,27 @@ export class EventsService {
           duplicate: true,
         };
       }
+      throw error;
+    }
+  }
+
+  /**
+   * Store a weigh-in's walk-in claim ticket, once.
+   *
+   * Idempotent on the event: the first code sent for an event is the one that
+   * counts, so a retry cannot swap it. A quarantined event still gets its
+   * ticket; the refusal happens at claim time, where the customer can be told
+   * why rather than being told the code does not exist.
+   */
+  private async recordClaim(eventId: string, claimCode: string): Promise<void> {
+    const existing = await this.claims.findOne({ where: { eventId }, select: { id: true } });
+    if (existing) return;
+
+    try {
+      await this.claims.insert({ eventId, claimCodeHash: hashClaimCode(claimCode) });
+    } catch (error) {
+      // A concurrent retry got there first; its row is the same ticket.
+      if (error instanceof QueryFailedError && (error as any).code === UNIQUE_VIOLATION) return;
       throw error;
     }
   }

@@ -18,6 +18,7 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
+import { CLAIM_CODE_PATTERN } from "../wallet/claim-code";
 import {
   BATCH_STATUSES,
   MATERIAL_CODE_MAX_LENGTH,
@@ -125,6 +126,18 @@ export class SubmitWeighInDto {
   @IsNotEmpty()
   @MaxLength(200)
   signature: string;
+
+  /**
+   * The walk-in claim code the phone showed as a QR for this weigh-in (see
+   * `WeighInClaimEntity`). Outside the signed payload by design: it is not
+   * evidence, only a claim ticket, and the payload schema is what every
+   * verifier of the record depends on. Optional because a doorstep weigh-in is
+   * credited through its request instead, and older phones never send one.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(CLAIM_CODE_PATTERN, { message: "claimCode must be 10 characters from A-Z (no I or O) and 2-9" })
+  claimCode?: string;
 }
 
 export class CreateCollectorDto {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import QRCode from "qrcode";
 import {
   api,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/api";
 import { formatDateTime, formatKg, formatNaira, materialEmoji } from "@/lib/format";
 import { Emoji } from "@/app/Emoji";
+import { ScanButton } from "../wallet/ScanButton";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +33,58 @@ export const dynamic = "force-dynamic";
  * them on paper via `/requests`.
  */
 
+/**
+ * Claim a code from the scan section: a walk-in weigh-in's QR, or a pickup's.
+ *
+ * The same `POST /wallet/redeem` the wallet page uses; the backend tells the two
+ * kinds of code apart. Lands back on this page with what was credited, so the
+ * person at the scale sees the result where they scanned, not on another screen.
+ */
+async function claimAction(formData: FormData) {
+  "use server";
+
+  const code = String(formData.get("code") ?? "").trim();
+  if (!code) redirect("/requester/dashboard?claimError=" + encodeURIComponent("Scan the QR or type its code first.") + "#scan");
+
+  let credited: { amount: number; description: string; balance: number };
+  try {
+    const result = await requesterApi.redeemCode(code);
+    credited = {
+      amount: Number(result.transaction.amountCredits),
+      description: result.transaction.description ?? "",
+      balance: result.balanceCredits,
+    };
+  } catch (error) {
+    const message =
+      error instanceof ApiError
+        ? (error.detail ?? `Request failed (${error.status}).`)
+        : "Could not reach the backend. Nothing was credited; try again.";
+    redirect(`/requester/dashboard?claimError=${encodeURIComponent(message)}#scan`);
+  }
+
+  revalidatePath("/requester/dashboard");
+  revalidatePath("/requester/wallet");
+  const params = new URLSearchParams({
+    credited: String(credited.amount),
+    what: credited.description,
+    balance: String(credited.balance),
+  });
+  redirect(`/requester/dashboard?${params.toString()}#scan`);
+}
+
 function statusTone(status: CollectionRequest["status"]): "neutral" | "bad" | undefined {
   if (status === "redeemed") return undefined; // default pill tone = accent green, reads as "done"
   if (status === "cancelled") return "bad";
   return "neutral"; // requested / assigned / collected — still in flight
 }
 
-export default async function RequesterDashboardPage() {
+export default async function RequesterDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ credited?: string; what?: string; balance?: string; claimError?: string }>;
+}) {
+  const { credited, what, balance, claimError } = await searchParams;
+
   let viewer: Requester;
   try {
     viewer = await requesterApi.me();
@@ -99,6 +146,62 @@ export default async function RequesterDashboardPage() {
           {viewer.name || viewer.email}
         </h1>
       </header>
+
+      {/*
+        Scan to get credited. First on the page because it is the one thing
+        done with someone waiting: the collector is holding their phone out.
+      */}
+      <section className="rq-claim" id="scan" aria-labelledby="scan-title">
+        <div>
+          <p className="rq-eyebrow">Dropped off at a collector?</p>
+          <h2 id="scan-title">Scan to get credited</h2>
+        </div>
+        <p className="rq-claim-lede">
+          After your material is weighed, the collector shows a QR code on their phone. Scan it
+          here and the weight goes straight into your wallet as credits. Each code can be claimed
+          once.
+        </p>
+
+        {credited ? (
+          <div className="rq-credited" role="status">
+            <strong>+{Number(credited).toLocaleString()} credits</strong>
+            {what ? <p>{what}</p> : null}
+            {balance ? (
+              <p>
+                New balance: {Number(balance).toLocaleString()} credits ({formatNaira(Number(balance))})
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {claimError ? (
+          <p className="rq-claim-error" role="alert">
+            {claimError}
+          </p>
+        ) : null}
+
+        {/* Fills #claimCode and submits the form below through its own action. */}
+        <ScanButton targetInputId="claimCode" autoSubmit primary label="Scan QR code" />
+
+        <form action={claimAction} className="rq-claim-form">
+          <label htmlFor="claimCode">
+            Or type the code under the QR
+            <input
+              id="claimCode"
+              name="code"
+              required
+              maxLength={16}
+              placeholder="K7M2Q-RT9XA"
+              autoCapitalize="characters"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </label>
+          <button className="rq-btn" data-variant="on-dark" type="submit">
+            Claim
+          </button>
+        </form>
+      </section>
 
       <div className="rq-grid">
         <div className="rq-card" style={{ marginBottom: 0 }}>
