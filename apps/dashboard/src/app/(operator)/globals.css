@@ -666,6 +666,12 @@ button.signin-link {
   min-width: 0;
 }
 
+/* Lifts the page controls off the title's descender line so they sit centred
+   on the title's cap height rather than hanging below it. */
+.page-head > .actions {
+  margin-bottom: var(--space-1);
+}
+
 .page-eyebrow {
   font-family: var(--sans);
   font-size: var(--text-2xs);
@@ -783,20 +789,34 @@ h3 {
  */
 .segmented {
   display: inline-flex;
-  padding: 3px;
-  gap: 2px;
+  align-items: stretch;
+  padding: var(--space-1);
+  gap: var(--space-1);
   background: var(--paper-sunk);
   border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
   flex-wrap: wrap;
 }
 
+/*
+ * Every segment is the same width and height, text centred, so the row reads
+ * as one even control rather than a run of links of whatever length their
+ * word happens to be. The border is always present (transparent when idle)
+ * so selecting a segment never shifts its neighbours by a pixel.
+ */
 .segmented a {
-  font-size: var(--text-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6.5rem;
+  min-height: 44px;
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--ink-soft);
   text-decoration: none;
-  padding: var(--space-2) var(--space-3);
+  text-transform: capitalize;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   line-height: 1.2;
   white-space: nowrap;
@@ -811,10 +831,9 @@ h3 {
 
 .segmented a[aria-current="true"] {
   background: var(--surface);
-  border: 1px solid var(--rule);
+  border-color: var(--rule);
   color: var(--ink);
   font-weight: 600;
-  padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px);
 }
 
 /* ---------- metrics ---------- */
@@ -923,13 +942,37 @@ th {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--rule);
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 td {
   padding: var(--space-4);
   border-bottom: 1px solid var(--rule);
   vertical-align: middle;
+  text-align: left;
   line-height: 1.45;
+}
+
+/* Heads follow their column: a right-aligned figure gets a right-aligned
+   head, so label and digits share one edge. */
+th.num {
+  text-align: right;
+}
+
+/*
+ * Icons in a cell sit in a fixed 24×24 box. An emoji's advance width varies
+ * by glyph and platform, so without this the word after it starts at a
+ * slightly different x on every row and the column looks ragged.
+ */
+td .emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  vertical-align: middle;
+  margin-right: var(--space-1);
 }
 
 tbody tr:last-child td {
