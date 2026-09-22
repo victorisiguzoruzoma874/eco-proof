@@ -37,9 +37,9 @@ async function signIn(formData: FormData) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; signedOut?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, signedOut } = await searchParams;
 
   return (
     <main style={{ maxWidth: "26rem", margin: "0 auto" }}>
@@ -48,6 +48,10 @@ export default async function LoginPage({
       {error ? (
         <p className="error" style={{ marginTop: 0, marginBottom: "1.25rem" }}>
           Those credentials were not accepted.
+        </p>
+      ) : signedOut ? (
+        <p className="note" style={{ marginTop: 0, marginBottom: "1.25rem" }}>
+          You have signed out.
         </p>
       ) : null}
 

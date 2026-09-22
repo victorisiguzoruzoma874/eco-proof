@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { signOut } from "./sign-out";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -47,14 +48,26 @@ function isActive(pathname: string, href: string): boolean {
  * trigger again is a trap once the pointer has moved on, and one that survives
  * a route change hangs over the page it just took you to.
  */
-function useDismissable(open: boolean, close: () => void, pathname: string) {
+function useDismissable(
+  open: boolean,
+  close: () => void,
+  pathname: string,
+  /**
+   * A panel rendered outside the element `ref` is attached to. Without it, a
+   * press inside that panel counts as "outside": the panel closes on mousedown
+   * and unmounts before the click lands, so none of its links ever navigated.
+   */
+  panel?: React.RefObject<HTMLElement | null>,
+) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
 
     function onPointerDown(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) close();
+      const target = event.target as Node;
+      if (panel?.current?.contains(target)) return;
+      if (ref.current && !ref.current.contains(target)) close();
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") close();
@@ -66,7 +79,7 @@ function useDismissable(open: boolean, close: () => void, pathname: string) {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, close]);
+  }, [open, close, panel]);
 
   useEffect(() => {
     close();
@@ -78,7 +91,7 @@ function useDismissable(open: boolean, close: () => void, pathname: string) {
   return ref;
 }
 
-export function OperatorNav() {
+export function OperatorNav({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -86,7 +99,8 @@ export function OperatorNav() {
   const moreActive = MORE.some((item) => isActive(pathname, item.href));
 
   const moreRef = useDismissable(moreOpen, () => setMoreOpen(false), pathname);
-  const menuRef = useDismissable(menuOpen, () => setMenuOpen(false), pathname);
+  const menuPanelRef = useRef<HTMLElement>(null);
+  const menuRef = useDismissable(menuOpen, () => setMenuOpen(false), pathname, menuPanelRef);
 
   return (
     <>
@@ -155,7 +169,7 @@ export function OperatorNav() {
       </div>
 
       {menuOpen ? (
-        <nav className="nav-panel" id="operator-menu" aria-label="Operator sections">
+        <nav className="nav-panel" id="operator-menu" aria-label="Operator sections" ref={menuPanelRef}>
           {PRIMARY.map((item) => (
             <Link
               key={item.href}
@@ -186,9 +200,17 @@ export function OperatorNav() {
            * on a phone.
            */}
           <p className="nav-panel-group">Account</p>
-          <Link href="/login" className="nav-link">
-            Sign in
-          </Link>
+          {signedIn ? (
+            <form action={signOut}>
+              <button type="submit" className="nav-link">
+                Sign out
+              </button>
+            </form>
+          ) : (
+            <Link href="/login" className="nav-link">
+              Sign in
+            </Link>
+          )}
           <Link href="/requester/login" className="nav-link">
             Requester login
           </Link>

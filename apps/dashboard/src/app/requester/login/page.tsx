@@ -40,16 +40,20 @@ async function signIn(formData: FormData) {
 export default async function RequesterLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; signedOut?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, signedOut } = await searchParams;
 
   return (
     <div className="rq-card" style={{ marginTop: "2.5rem" }}>
       <p className="rq-eyebrow">Requester access</p>
       <h1 style={{ margin: "0 0 1.25rem", fontSize: "1.5rem" }}>Sign in</h1>
 
-      {error ? <p className="rq-error">Those credentials were not accepted.</p> : null}
+      {error ? (
+        <p className="rq-error">Those credentials were not accepted.</p>
+      ) : signedOut ? (
+        <p className="rq-note">You have signed out.</p>
+      ) : null}
 
       <form action={signIn}>
         <label className="rq-field">

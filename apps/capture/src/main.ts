@@ -698,7 +698,7 @@ async function captureScreen(): Promise<string> {
           <span>Collector</span>
         </span>
         <strong style="font-size:1.125rem">${escapeHtml(p.collectorName)}</strong>
-        <button class="ghost small" type="button" id="forget-device">Forget this device</button>
+        <button class="ghost small" type="button" id="sign-out">Sign out</button>
       </div>
 
       <div class="field">
@@ -1089,7 +1089,7 @@ function wireCapture(): void {
     });
   }
   on("sync", "click", runSync);
-  on("forget-device", "click", forgetDevice);
+  on("sign-out", "click", () => void signOut());
 
   for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-discard]")) {
     btn.addEventListener("click", () => {
@@ -1359,7 +1359,8 @@ async function discardItem(id: string): Promise<void> {
 }
 
 /**
- * Drop back to the provisioning screen so this phone can re-enrol.
+ * Sign this phone out: drop back to the sign-in screen until an operator signs
+ * in again.
  *
  * Only clears `PROVISION_KEY` — which hub/collector this phone is assigned
  * to — not the signing identity itself (`loadOrCreateIdentity`'s own storage
@@ -1369,13 +1370,30 @@ async function discardItem(id: string): Promise<void> {
  * under it — enrols it as new. Nothing already synced or still queued is
  * invalidated either way.
  */
-function forgetDevice(): void {
-  if (!window.confirm("Forget this device? An operator will need to sign back in on this phone before capturing again.")) {
-    return;
-  }
+async function signOut(): Promise<void> {
+  // Queued weigh-ins were signed when they were captured, so they stay valid
+  // and still drain once there is signal — but the collector should know they
+  // are there before handing the phone over.
+  const { queued, syncing } = await queue.counts();
+  const waiting = queued + syncing;
+  const prompt =
+    waiting > 0
+      ? `Sign out? ${waiting} weigh-in${waiting === 1 ? " is" : "s are"} still waiting to sync. ` +
+        "They are kept and will send once there is signal."
+      : "Sign out? An operator will need to sign in on this phone before capturing again.";
+  if (!window.confirm(prompt)) return;
+
   localStorage.removeItem(PROVISION_KEY);
   provisioning = null;
-  void render();
+  // Everything tied to the collector who was signed in, so whoever signs in
+  // next does not inherit their pickups or a door code meant for their customer.
+  jobs = [];
+  activeJob = null;
+  jobsError = null;
+  doorProof = null;
+  lastProof = null;
+  notice = { tone: "good", text: "Signed out." };
+  await render();
 }
 
 async function drainQueue(): Promise<void> {

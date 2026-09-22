@@ -567,6 +567,40 @@
   background: rgba(53, 184, 121, 0.16);
   font-weight: 800;
 }
+/*
+ * `.rq-shell a` (and its :hover) outrank a bare `.rq-tab`, which turned every
+ * inactive tab the body-link green — near-invisible on this dark bar — and its
+ * hover darker still. Restated at link specificity so the tabs keep their own
+ * colours, and match the Sign out tab, which is a button and never had this.
+ */
+.rq-shell a.rq-tab {
+  color: rgba(250, 249, 244, 0.76);
+}
+.rq-shell a.rq-tab:hover,
+.rq-shell a.rq-tab[data-active="true"] {
+  color: #fff;
+}
+
+/*
+ * Sign out is one more tab in the bottom bar, but a <button> inside a <form>
+ * (the cookie is httpOnly, so a server action has to clear it). The form takes
+ * the tab's share of the row; the button drops its native chrome.
+ */
+.rq-signout {
+  display: flex;
+  flex: 1;
+}
+.rq-signout .rq-tab {
+  width: 100%;
+  font-family: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.rq-signout .rq-tab:hover {
+  background: rgba(53, 184, 121, 0.14);
+  color: #fff;
+}
 
 /* Desktop/tablet: the fixed bottom bar becomes a sticky left sidebar with
    room for the brand header, matching the wider "professional" chrome. */
@@ -610,7 +644,24 @@
   .rq-tab[data-active="true"] {
     border-left-color: var(--rq-accent-2);
   }
+  /*
+   * Set apart from the places you navigate to, but directly under them: the
+   * sidebar stretches to the page's full height, so pinning this to its foot
+   * would put it below the fold on any long page.
+   */
+  .rq-signout {
+    flex: none;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(250, 249, 244, 0.12);
+  }
+  .rq-signout .rq-tab {
+    width: calc(100% + 0.5rem);
+    /* The link tabs' active-marker border, so the label lines up with theirs. */
+    border-left: 3px solid transparent;
+  }
 }
+
 
 .rq-table {
   width: 100%;

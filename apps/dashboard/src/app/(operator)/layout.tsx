@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { ThemeToggle } from "./ThemeToggle";
 import { OperatorNav } from "./OperatorNav";
+import { signOut } from "./sign-out";
+import { TOKEN_COOKIE } from "@/lib/api";
 import "./globals.css";
 
 /*
@@ -66,7 +69,11 @@ const plexMono = IBM_Plex_Mono({
  * `requester-auth.guard.ts`) never sees the operator's admin chrome around
  * their own screens.
  */
-export default function OperatorLayout({ children }: { children: React.ReactNode }) {
+export default async function OperatorLayout({ children }: { children: React.ReactNode }) {
+  // Presence of the cookie, not a /auth/me round trip on every navigation: an
+  // expired token still shows "Sign out", and signing out of it is harmless.
+  const signedIn = Boolean((await cookies()).get(TOKEN_COOKIE)?.value);
+
   return (
     <div
       className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} operator-root`}
@@ -76,7 +83,7 @@ export default function OperatorLayout({ children }: { children: React.ReactNode
           <Link className="brand" href="/">
             ProofChain <em>ledger</em>
           </Link>
-          <OperatorNav />
+          <OperatorNav signedIn={signedIn} />
           <div className="topbar-actions">
             {/*
              * A requester is a different account and trust boundary from
@@ -87,9 +94,17 @@ export default function OperatorLayout({ children }: { children: React.ReactNode
             <Link className="requester-link" href="/requester/login">
               Requester login
             </Link>
-            <Link className="signin-link" href="/login">
-              Sign in
-            </Link>
+            {signedIn ? (
+              <form action={signOut}>
+                <button type="submit" className="signin-link">
+                  Sign out
+                </button>
+              </form>
+            ) : (
+              <Link className="signin-link" href="/login">
+                Sign in
+              </Link>
+            )}
             <ThemeToggle />
           </div>
         </div>

@@ -547,6 +547,31 @@ nav.links {
 }
 
 /*
+ * "Sign out" is a <button> in a <form> (a server action has to delete the
+ * httpOnly cookie), but it must look exactly like the "Sign in" link it
+ * replaces. The forms are made layout-transparent so the button sits in the
+ * topbar row and the mobile panel as the link did.
+ */
+button.signin-link {
+  font-family: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.topbar-actions form,
+.nav-panel form {
+  display: contents;
+}
+
+/* A block <button> does not stretch or left-align the way a block <a> does. */
+.nav-panel button.nav-link {
+  width: 100%;
+  text-align: left;
+}
+
+/*
  * Below 1120px the six primary links, the More menu, both account links and
  * the theme toggle stop fitting on one 64px row — measured, not guessed: the
  * row needs about 1110px plus gutters before anything wraps or clips.
