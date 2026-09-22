@@ -79,9 +79,20 @@ export class RegistryService {
     return this.devices.save(device);
   }
 
-  listDevices(collectorId?: string) {
+  /**
+   * Devices, optionally narrowed to a collector or to one public key.
+   *
+   * The key filter is how a phone that has lost its local pairing finds out it
+   * is still enrolled: the key is unique forever, so re-enrolling it can only
+   * 409. Revoked devices are returned too — the phone needs to know its key is
+   * dead so it can rotate to a fresh one rather than retry it.
+   */
+  listDevices(collectorId?: string, publicKeyBase64?: string) {
     return this.devices.find({
-      where: collectorId ? { collectorId } : {},
+      where: {
+        ...(collectorId ? { collectorId } : {}),
+        ...(publicKeyBase64 ? { publicKeyBase64 } : {}),
+      },
       order: { enrolledAt: "DESC" },
     });
   }

@@ -21,8 +21,11 @@ export class RegistryController {
   }
 
   @Get("devices")
-  listDevices(@Query("collectorId") collectorId?: string) {
-    return this.registry.listDevices(collectorId);
+  listDevices(
+    @Query("collectorId") collectorId?: string,
+    @Query("publicKeyBase64") publicKeyBase64?: string,
+  ) {
+    return this.registry.listDevices(collectorId, publicKeyBase64);
   }
 
   @Roles("admin", "operator")

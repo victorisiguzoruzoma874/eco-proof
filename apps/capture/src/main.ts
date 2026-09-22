@@ -45,6 +45,7 @@ import {
   hashPhoto,
   loadOrCreateIdentity,
   randomId,
+  resetIdentity,
   randomNonce,
   signWeighIn,
 } from "./lib/identity";
@@ -65,6 +66,7 @@ import {
   fetchCollectors,
   fetchHubDirectory,
   fetchHubs,
+  findEnrolledDevice,
   operatorLogin,
   setBackendUrl,
   syncPending,
@@ -108,7 +110,8 @@ interface Provisioning {
 
 const PROVISION_KEY = "proofchain.device.provisioning.v1";
 
-const identity = loadOrCreateIdentity();
+// `let` because a revoked key is rotated in place during pairing; see wireProvision.
+let identity = loadOrCreateIdentity();
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 let provisioning: Provisioning | null = readProvisioning();
@@ -621,7 +624,7 @@ function provisionScreen(): string {
 
       <div class="field">
         <span class="label">Device public key</span>
-        <code class="meta" style="user-select:all">${escapeHtml(identity.publicKeyBase64)}</code>
+        <code class="meta" id="pubkey" style="user-select:all">${escapeHtml(identity.publicKeyBase64)}</code>
       </div>
 
       <div class="field">
@@ -639,7 +642,7 @@ function provisionScreen(): string {
         <input id="password" type="password" autocomplete="current-password" />
       </div>
 
-      <button class="action" id="load">Sign in &amp; load collectors</button>
+      <button class="action" id="load">Sign in</button>
 
       <div id="assign" hidden>
         <div class="field">
@@ -829,6 +832,38 @@ async function captureScreen(): Promise<string> {
 
 // ---------------------------------------------------------------- wiring
 
+/**
+ * Record which collector and hub this phone captures for.
+ *
+ * Shared by a fresh enrolment and by signing back in to an existing one, so the
+ * two can never drift apart in what they store.
+ */
+function savePairing(input: {
+  deviceId: string;
+  collectorId: string;
+  collectorName: string;
+  hub: { id: string; code: string; name: string };
+  hubs: Awaited<ReturnType<typeof fetchHubs>>;
+}): void {
+  saveProvisioning({
+    collectorId: input.collectorId,
+    hubId: input.hub.id,
+    deviceId: input.deviceId,
+    collectorName: input.collectorName,
+    hubName: `${input.hub.code} — ${input.hub.name}`,
+    // Snapshot every hub while an operator token is still in hand: this is
+    // the only moment the device can see the list, and it is what lets a
+    // collector move between sites later without signal or a login.
+    hubs: input.hubs.map((h) => ({
+      id: h.id,
+      code: h.code,
+      name: h.name,
+      minWeightKg: h.minWeightKg,
+      maxWeightKg: h.maxWeightKg,
+    })),
+  });
+}
+
 function wireProvision(): void {
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   let token = "";
@@ -847,8 +882,46 @@ function wireProvision(): void {
         $<HTMLInputElement>("password").value,
       );
 
-      const [collectors, hubs] = await Promise.all([fetchCollectors(token), fetchHubs(token)]);
+      const [collectors, hubs, existing] = await Promise.all([
+        fetchCollectors(token),
+        fetchHubs(token),
+        findEnrolledDevice(token, identity.publicKeyBase64),
+      ]);
       loadedHubs = hubs;
+
+      // Already enrolled: the operator's credentials have just been verified,
+      // so sign straight back in. Offering the enrolment form here would only
+      // end in a 409 — the key is unique on the server forever.
+      if (existing && !existing.revokedAt) {
+        const hub = hubs[0];
+        if (!hub) throw new Error("No hubs exist yet. An admin must create one before this phone can capture.");
+        const collector = collectors.find((c) => c.id === existing.collectorId);
+
+        // The server does not remember which hub the phone last used, so start
+        // at the first; the capture screen's hub switcher covers the rest.
+        savePairing({
+          deviceId: existing.id,
+          collectorId: existing.collectorId,
+          collectorName: collector?.name ?? "Collector",
+          hub,
+          hubs,
+        });
+        notice = {
+          tone: "good",
+          text: `Welcome back. This phone is already enrolled for ${collector?.name ?? "its collector"}.`,
+        };
+        void render();
+        return;
+      }
+
+      // Revoked: that key can never be enrolled again, so replace it and pair
+      // the new one. Anything still queued was signed by the dead key and would
+      // be refused either way; rotating loses nothing that was not already lost.
+      if (existing?.revokedAt) {
+        resetIdentity();
+        identity = loadOrCreateIdentity();
+        $("pubkey").textContent = identity.publicKeyBase64;
+      }
 
       const collectorSelect = $<HTMLSelectElement>("collector");
       collectorSelect.innerHTML = collectors
@@ -861,7 +934,12 @@ function wireProvision(): void {
         .join("");
 
       $("assign").hidden = false;
-      notice = { tone: "good", text: "Signed in. Choose the collector and hub for this phone." };
+      notice = existing?.revokedAt
+        ? {
+            tone: "warn",
+            text: "This phone's previous key was revoked, so it has made a new one. Choose the collector and hub to enrol it.",
+          }
+        : { tone: "good", text: "Signed in. This phone is new — choose the collector and hub to enrol it." };
       const current = document.querySelector(".notice");
       if (current) current.outerHTML = noticeHtml();
     } catch (error) {
@@ -884,25 +962,15 @@ function wireProvision(): void {
       const hub = loadedHubs.find((h) => h.id === hubSelect.value);
       if (!hub) throw new Error("selected hub not found");
 
-      saveProvisioning({
-        collectorId: collectorSelect.value,
-        hubId: hubSelect.value,
+      savePairing({
         deviceId,
+        collectorId: collectorSelect.value,
         collectorName: collectorSelect.selectedOptions[0]?.textContent ?? "Collector",
-        hubName: hubSelect.selectedOptions[0]?.textContent ?? "Hub",
-        // Snapshot every hub while an operator token is still in hand: this is
-        // the only moment the device can see the list, and it is what lets a
-        // collector move between sites later without signal or a login.
-        hubs: loadedHubs.map((h) => ({
-          id: h.id,
-          code: h.code,
-          name: h.name,
-          minWeightKg: h.minWeightKg,
-          maxWeightKg: h.maxWeightKg,
-        })),
+        hub,
+        hubs: loadedHubs,
       });
 
-      notice = { tone: "good", text: "Device enrolled. Ready to capture." };
+      notice = { tone: "good", text: "Device enrolled and signed in. Ready to capture." };
       void render();
     } catch (error) {
       notice = { tone: "bad", text: (error as Error).message };
@@ -1295,14 +1363,14 @@ async function discardItem(id: string): Promise<void> {
  *
  * Only clears `PROVISION_KEY` — which hub/collector this phone is assigned
  * to — not the signing identity itself (`loadOrCreateIdentity`'s own storage
- * key, untouched). Re-enrolling issues a fresh server-side device record for
- * the *same* keypair, so nothing already-synced or still-queued under the old
- * enrolment is invalidated by this; it only fixes captures from here on,
- * which is exactly what's needed when the server no longer recognises this
- * device — most commonly a dev backend that was reset out from under it.
+ * key, untouched). Signing back in looks the key up: a server that still knows
+ * it restores the pairing directly (the key is unique, so it cannot be enrolled
+ * twice), and one that does not — most commonly a dev backend reset out from
+ * under it — enrols it as new. Nothing already synced or still queued is
+ * invalidated either way.
  */
 function forgetDevice(): void {
-  if (!window.confirm("Forget this device? You will need to sign back in and re-enrol before capturing again.")) {
+  if (!window.confirm("Forget this device? An operator will need to sign back in on this phone before capturing again.")) {
     return;
   }
   localStorage.removeItem(PROVISION_KEY);

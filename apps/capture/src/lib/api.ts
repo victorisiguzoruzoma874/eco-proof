@@ -279,6 +279,25 @@ export async function fetchHubDirectory(): Promise<
   return (await res.json()) as Awaited<ReturnType<typeof fetchHubDirectory>>;
 }
 
+/**
+ * The server's record for this phone's key, if it has one.
+ *
+ * A phone that lost its local pairing still holds its key, and the key is
+ * unique on the server forever — so asking is the only way to sign back in
+ * rather than dead-end on a 409 from `enrolDevice`. Revoked records come back
+ * too; the caller decides what a dead key means.
+ */
+export async function findEnrolledDevice(
+  token: string,
+  publicKeyBase64: string,
+): Promise<{ id: string; collectorId: string; revokedAt: string | null } | null> {
+  const devices = await authedGet<{ id: string; collectorId: string; revokedAt: string | null }[]>(
+    `/devices?publicKeyBase64=${encodeURIComponent(publicKeyBase64)}`,
+    token,
+  );
+  return devices[0] ?? null;
+}
+
 export async function enrolDevice(
   token: string,
   input: { collectorId: string; label: string; publicKeyBase64: string },
