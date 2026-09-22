@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Poppins } from "next/font/google";
 import { ThemeToggle } from "./ThemeToggle";
 import { OperatorNav } from "./OperatorNav";
 import { signOut } from "./sign-out";
@@ -8,7 +8,7 @@ import { TOKEN_COOKIE } from "@/lib/api";
 import "./globals.css";
 
 /*
- * Three faces, and the third is the one that matters most here — see
+ * Two faces, and the second is the one that matters most here — see
  * `docs/typography.md`.
  *
  * Loaded as CSS variables rather than class names so `globals.css` keeps
@@ -16,28 +16,23 @@ import "./globals.css";
  */
 
 /*
- * Display: the wordmark and the page title.
+ * Everything a person reads: the wordmark, the page title, navigation, tables,
+ * forms, badges, metadata, and every figure.
  *
- * Fraunces carries a true optical-size axis, so unlike the Didone it replaced
- * it is redrawn for the size rather than scaled to it — which is what lets one
- * face hold a 54px page title and a 20px wordmark without either going flabby
- * or falling apart. `globals.css` pins its `SOFT` and `WONK` axes; see the
- * `--serif` token for why.
- */
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
-  variable: "--font-display",
-});
-
-/*
- * Text: navigation, tables, forms, badges, metadata, and every figure.
+ * One family across display and text, where this sheet previously paired
+ * Fraunces with IBM Plex Sans. Poppins is a geometric sans with a single
+ * skeleton at every size, so the hierarchy has to come from weight, size and
+ * space rather than from a change of voice — which is why the page title is
+ * set at 600 and the body at 400 rather than relying on a serif to do that
+ * work.
  *
- * Plex was commissioned to give an engineering company a voice of its own, and
- * it reads as instrument rather than as app — the right register for a screen
- * an auditor uses to decide whether to believe a number.
+ * Declared once and aliased in `globals.css`, so the display and text tokens
+ * resolve to the same face without paying for a second download.
+ *
+ * 500 earns its place: it is the nav and table-header weight, and skipping it
+ * would push those to 600 and make the bar shout.
  */
-const plexSans = IBM_Plex_Sans({
+const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
@@ -52,8 +47,10 @@ const plexSans = IBM_Plex_Sans({
  * meant the most scrutinised text in the product rendered in a different
  * typeface on every viewer's machine.
  *
- * Plex Mono is drawn as this sans's sibling, so a hash and the weight beside it
- * share a skeleton instead of being strangers.
+ * Kept as Plex Mono while the rest of the product moved to Poppins, because
+ * Poppins has no monospace cut and a proportional face is the wrong tool for a
+ * string someone transcribes character by character. A hash and the weight
+ * beside it no longer share a skeleton; legibility of the hash wins.
  */
 const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
@@ -76,7 +73,7 @@ export default async function OperatorLayout({ children }: { children: React.Rea
 
   return (
     <div
-      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} operator-root`}
+      className={`${poppins.variable} ${plexMono.variable} operator-root`}
     >
       <header className="topbar no-print">
         <div className="topbar-inner">

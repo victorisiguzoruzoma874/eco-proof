@@ -4,7 +4,7 @@
 
 This document describes:
 
-1. The three faces and the single job each one has
+1. The two faces and the job each one has
 2. The rule that decides when text is set in a monospace
 3. The shared type scale
 4. How each surface loads the faces, and why they differ
@@ -30,44 +30,80 @@ offered, which on the cheap Androids it actually runs on means a different
 metric per device and a weight numeral that is a different width on every phone
 in the fleet.
 
-## The three faces
+## The two faces
 
 | Role    | Face          | Used for                                       |
 | ------- | ------------- | ---------------------------------------------- |
-| Display | Fraunces      | The wordmark and the page title. Nowhere else. |
-| Text    | IBM Plex Sans | Everything else, every figure included.        |
+| Display | Poppins       | The wordmark and the page title.                |
+| Text    | Poppins       | Everything else, every figure included.        |
 | Machine | IBM Plex Mono | Machine strings only. See the rule below.      |
 
-**Fraunces** carries a true optical-size axis, so it is redrawn for the size
-rather than scaled to it — which is what lets one face hold a 54px page title
-and a 20px wordmark without either going flabby or falling apart. Its remit is
-still narrow: a wordmark and a page title, and nothing inside a table's
-neighbourhood. Section headings are Plex Sans; a serif at 20px beside a ledger
-reads as a magazine standfirst dropped into a spreadsheet.
+**Poppins** carries display and text alike. Display and text used to be two
+faces — Fraunces over IBM Plex Sans — and collapsing them to one moves the
+entire burden of hierarchy onto weight, size and space. A page title is 600 at
+fluid 38→54 against body copy at 400; there is no change of voice underneath
+it, so that gap has to be defended in the stylesheet rather than assumed. A
+section heading that creeps upward now costs the page title its force.
 
-Two of its personality axes are pinned off, once, in `--fraunces-axes`:
+The display role survives as a token (`--display`, `--rq-display`) even though
+it resolves to the same family. Every rule that means "this is a title" still
+says so, which makes reintroducing a second display face a one-line change
+rather than a hunt through the sheet.
 
-- `SOFT 0` — sharp terminals rather than rounded ones.
-- `WONK 0` — the upright `g` and straight-legged `a`, not the swash forms.
+**IBM Plex Mono did not move.** It is the one face that stayed when everything
+around it became Poppins, for a functional reason: Poppins has no monospace
+cut, and machine strings are the strings a person transcribes character by
+character. A Merkle root compared against a ledger by eye, a device public key,
+an eight-character redemption code read off a collector's phone at a doorstep —
+a proportional face is the wrong tool for all of them.
 
-Both defaults are charming and both are wrong here. This is a screen where an
-auditor decides whether to believe a tonnage; the wonky alternates read as a
-magazine having fun. The face keeps its warmth through optical sizing and its
-slightly flared stems, which is as much personality as this product should
-carry.
-
-**IBM Plex Sans and IBM Plex Mono are siblings**, and that is the whole reason
-for choosing Plex over a pair drawn by different hands. A Merkle root and the
-weight beside it share a skeleton, proportions and rhythm, so a table row reads
-as one instrument rather than as two fonts meeting. Plex was also commissioned
-to give an engineering company a voice of its own: it reads as instrument, not
-as app, which is the right register for a product whose argument is "check it
-yourself".
+The cost is that the sans and the mono are no longer siblings. Plex Sans and
+Plex Mono were drawn by the same hand, so a hash and the weight beside it used
+to share a skeleton; now they are two families meeting in a table row. That is
+a deliberate trade — legibility of the transcribed string beats the harmony of
+the row.
 
 One OpenType feature is forced on globally rather than per component:
 
-- `tnum` — fixed-width digits, so a column of amounts lines up. This, not a
-  change of typeface, is what holds a column.
+- `tnum` — fixed-width digits, so a column of amounts lines up.
+
+### Known gap: Poppins has no tabular figures
+
+`tnum` is currently a **no-op**. Poppins ships no `tnum` feature, and its
+figures are proportional rather than uniform — measured from
+`@fontsource/poppins` latin-400:
+
+| Digit | Advance width |
+| ----- | ------------- |
+| `1`   | 320           |
+| `7`   | 546           |
+| `0`   | 628           |
+| `6`   | 635           |
+
+A `1` is roughly half the width of a `0`, so anything relying on digits holding
+their column no longer does. Two places feel it:
+
+- **The capture weight readout** (`--numeral`, up to 6rem). It updates live as
+  the scale settles, so the number visibly shifts sideways between readings.
+  This is the worse of the two — it is the one thing that screen is arranged
+  around reading.
+- **Dashboard amount columns.** These are right-aligned by CSS, so the right
+  edge still lines up; what drifts is the position of digits and separators
+  within the column.
+
+The `font-variant-numeric: tabular-nums` declarations are left in place. They
+are correct, cost nothing, and start working the moment the face gains the
+feature or is swapped.
+
+Three ways out, none yet taken:
+
+1. **Accept it.** Right-aligned columns still align; only the live readout
+   genuinely misbehaves.
+2. **Set the figures that must align in Plex Mono.** It is already loaded in
+   both apps and is genuinely tabular. Costs the "a weight is a quantity, not a
+   machine string" distinction this system was built on.
+3. **Use a geometric sans that ships `tnum`** — Inter, DM Sans and Manrope all
+   do, and all sit in the same register as Poppins.
 
 Nothing else. Earlier revisions bought character-level disambiguation with
 Inter's `zero` and `cv05` features; it is now structural instead. The strings
@@ -185,12 +221,12 @@ What is imported there is audited rather than taken wholesale, because every
 unused cut is bytes a field phone caches forever:
 
 - Latin subsets only — no Cyrillic, Greek or Vietnamese, and no `woff` fallback.
-- Plex Sans at 400/500/600/700, checked against the `font-weight` values that
+- Poppins at 400/500/600/700, checked against the `font-weight` values that
   actually appear in `styles.css`.
 - Plex Mono at 400 only.
-- Fraunces on its `wght` axis alone: no italic, no optical-size range, no
-  `SOFT`/`WONK` alternates. On a metered SIM those axes are bytes spent on the
-  two words of the wordmark.
+
+Collapsing display and text into one family removed a whole face from this
+bundle — on a metered SIM, the wordmark no longer costs its own download.
 
 ### Why mobile names a family per weight
 

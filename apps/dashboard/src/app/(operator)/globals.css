@@ -4,9 +4,9 @@
  * The audience is an operator reconciling weights and an auditor deciding
  * whether to believe us, so the register is institutional financial software:
  * warm paper ground, borders instead of shadows, tabular figures on every
- * amount, and colour reserved strictly for state. The serif carries the brand
- * in the wordmark and the page title and appears nowhere else; Plex Sans carries
- * the product.
+ * amount, and colour reserved strictly for state. Poppins carries the whole
+ * product — wordmark, titles and body alike — so hierarchy is built from
+ * weight and space rather than from a second voice.
  *
  * Every token this section uses is declared in this block. Component rules
  * below may not invent a colour, a size, or a spacing value.
@@ -59,19 +59,20 @@
   --category-goods: #315c45;
 
   /* ---- type -------------------------------------------------------------
-   * `--font-display`/`--font-sans` are injected by next/font in
+   * `--font-sans`/`--font-mono` are injected by next/font in
    * `(operator)/layout.tsx`; the fallbacks keep the page readable if a face
    * fails to load rather than dropping to an unrelated default.
    *
-   *   --serif  Fraunces        the wordmark and the page title. Nowhere else.
-   *   --sans   IBM Plex Sans   everything else, every figure included.
-   *   --mono   IBM Plex Mono   machine strings only: Merkle roots, transaction
-   *                            hashes, ledger sequences, keys.
+   *   --display  Poppins        the wordmark and the page title.
+   *   --sans     Poppins        everything else, every figure included.
+   *   --mono     IBM Plex Mono  machine strings only: Merkle roots, transaction
+   *                             hashes, ledger sequences, keys.
    *
-   * The sans and the mono are siblings by design, and that is the point of
-   * choosing Plex over a pair drawn by different hands: a hash and the weight
-   * beside it share a skeleton, so a row reads as one instrument rather than as
-   * two fonts meeting. An amount is NOT a machine string — quantities are set
+   * Display and text are one family now. That puts the whole burden of
+   * hierarchy on weight, size and space, where a serif used to carry it — so a
+   * page title is 600 at 54px against body copy at 400, and the gap has to be
+   * defended in the rules below rather than assumed. An amount is NOT a
+   * machine string — quantities are set
    * in the sans with `tabular-nums`, which is what actually holds a column in
    * line; the mono is reserved for strings a person checks against another copy
    * character by character.
@@ -112,20 +113,6 @@
   --space-10: 2.5rem; /* 40 */
   --space-12: 3rem; /*   48 */
   --space-16: 4rem; /*   64 */
-
-  /*
-   * Fraunces' two personality axes, pinned once.
-   *
-   *   SOFT 0   sharp terminals rather than rounded ones
-   *   WONK 0   the upright `g` and straight-legged `a`, not the swash forms
-   *
-   * Both defaults exist and both are charming; both are wrong here. This is a
-   * screen where an auditor decides whether to believe a tonnage, and the
-   * wonky alternates read as a magazine having fun. The face keeps its warmth
-   * through its optical sizing and its slightly flared stems, which is as much
-   * personality as this product should carry.
-   */
-  --fraunces-axes: "SOFT" 0, "WONK" 0;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -259,12 +246,12 @@ body {
 }
 
 /*
- * The type tokens live here, not on `:root`, because `--font-display` and
- * --font-sans` are declared by next/font on THIS element — the wrapper in
+ * The type tokens live here, not on `:root`, because `--font-sans` and
+ * `--font-mono` are declared by next/font on THIS element — the wrapper in
  * `layout.tsx` — and a custom property is only visible to the element that
  * declares it and its descendants.
  *
- * Declaring `--serif`/`--sans` up on `:root` looks tidier and silently breaks
+ * Declaring `--display`/`--sans` up on `:root` looks tidier and silently breaks
  * the page: `var(--font-sans)` is unresolvable there, which makes the whole
  * `font-family` declaration invalid at computed-value time, and an invalid
  * font-family falls back to the initial value — the browser's default serif.
@@ -272,8 +259,15 @@ body {
  * skipped, because the stack itself never applies.
  */
 .operator-root {
-  --serif: var(--font-display), ui-serif, Georgia, "Iowan Old Style", serif;
+  /*
+   * `--display` and `--sans` resolve to the same family on purpose. Poppins
+   * covers both roles, so the token stays as a seam: every rule that means
+   * "this is a title" still says `var(--display)`, and pointing that at a
+   * second face later is a one-line change rather than a hunt through the
+   * sheet.
+   */
   --sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: var(--sans);
   --mono: var(--font-mono), ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
 
   font-family: var(--sans);
@@ -292,13 +286,10 @@ body {
    * in Plex Mono, which draws them apart by design.
    */
   font-feature-settings: "tnum" 1;
-  /* All three faces ship every weight this sheet asks for, so a synthesised one
+  /* Both faces ship every weight this sheet asks for, so a synthesised one
      is always a loading failure and should look like the fallback it is. */
   font-synthesis: none;
 
-  /* Fraunces is drawn per size by its optical-size axis; without this the
-     browser is free to ignore that and use one master for every heading. */
-  font-optical-sizing: auto;
   overflow-x: hidden;
 }
 
@@ -360,8 +351,7 @@ select:focus-visible {
  * regular weight reads as body copy that happens to be a serif.
  */
 .brand {
-  font-family: var(--serif);
-  font-variation-settings: var(--fraunces-axes);
+  font-family: var(--display);
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -646,11 +636,11 @@ button.signin-link {
 /* ---------- page header ---------- */
 
 /*
- * The page header pattern, and the one place the serif is allowed on a page.
+ * The page header pattern.
  *
- *   eyebrow   where in the product you are     Plex Sans 12 / 600 / caps
- *   title     what this page is                Fraunces, fluid 38→54
- *   summary   what you can do here             Plex Sans 15
+ *   eyebrow   where in the product you are     Poppins 12 / 600 / caps
+ *   title     what this page is                Poppins 600, fluid 38→54
+ *   summary   what you can do here             Poppins 15
  *
  * The eyebrow is the section's one deliberate use of capitals. It is two or
  * three words that name a queue, it never wraps, and it is the label a reader
@@ -687,11 +677,11 @@ button.signin-link {
 }
 
 .page-title {
-  font-family: var(--serif);
-  font-variation-settings: var(--fraunces-axes);
+  font-family: var(--display);
   font-size: var(--text-display);
-  /* 600, not 400. Fraunces' regular is a reading weight; a page title at 54px
-     needs the extra stem to hold the top of the page against a metric row. */
+  /* 600, not 400, and load-bearing now that the title shares a family with the
+     body: weight is the only thing separating them, so it has to be decisive.
+     Poppins' regular at 54px reads as an oversized paragraph. */
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.05;
@@ -723,14 +713,13 @@ button.signin-link {
 /* ---------- headings ---------- */
 
 /*
- * Section headings are Plex Sans, not the serif. A serif at 20px inside a data
- * table's neighbourhood reads as a magazine standfirst dropped into a ledger;
- * the hierarchy here comes from weight and space, and the serif stays rare
- * enough that the page title keeps all of its force.
+ * Section headings sit deliberately below the page title. With one family
+ * across the sheet there is no change of voice to separate them, so the gap is
+ * held by size and weight alone — which means a section heading must not creep
+ * upward, or the page title stops reading as the top of the page.
  */
 h1 {
-  font-family: var(--serif);
-  font-variation-settings: var(--fraunces-axes);
+  font-family: var(--display);
   font-size: var(--text-display);
   font-weight: 600;
   letter-spacing: -0.02em;

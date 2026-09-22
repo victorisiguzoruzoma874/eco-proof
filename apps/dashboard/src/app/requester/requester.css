@@ -35,24 +35,24 @@
   --rq-shadow-md: 0 6px 20px rgba(11, 31, 22, 0.08);
 
   /*
-   * `--rq-font-display`/`--rq-font-sans` are injected by next/font in
+   * `--rq-font-sans`/`--rq-font-mono` are injected by next/font in
    * `requester/layout.tsx` — the same two faces the operator dashboard loads.
    *
-   *   --rq-serif  Fraunces       the screen title. Nowhere else.
-   *   --rq-sans   IBM Plex Sans  everything else, every amount included.
-   *   --rq-mono   IBM Plex Mono  a redemption code, typed back in from a
-   *                              printed slip.
+   *   --rq-display  Poppins        the screen title.
+   *   --rq-sans     Poppins        everything else, every amount included.
+   *   --rq-mono     IBM Plex Mono  a redemption code, scanned or typed back in
+   *                                off a collector's screen.
    *
-   * Credits are a quantity, not a machine string: they are set in Plex Sans with
+   * Display and text are one family, so `--rq-display` resolves to `--rq-sans`
+   * and survives as a seam: a title still says what it is, and repointing it at
+   * a second face later is one line.
+   *
+   * Credits are a quantity, not a machine string: they are set in Poppins with
    * `tabular-nums`, which is what keeps a column of amounts aligned.
    */
-  --rq-serif: var(--rq-font-display), ui-serif, Georgia, "Iowan Old Style", serif;
   --rq-sans: var(--rq-font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rq-display: var(--rq-sans);
   --rq-mono: var(--rq-font-mono), ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
-
-  /* Sharp terminals, no swash alternates — see `--fraunces-axes` in the
-     operator stylesheet for why this product turns both axes off. */
-  --rq-fraunces-axes: "SOFT" 0, "WONK" 0;
 
   /*
    * The same scale as the operator dashboard and the landing site. This app
@@ -173,14 +173,12 @@
   border-radius: 0;
 }
 /*
- * The screen title, and the app's one use of the serif — the same face and the
- * same job it has on the operator side. Fraunces is redrawn per size by its
- * optical-size axis, so it holds at both of these scales and still never
- * appears on a card heading.
+ * The screen title — the same face and the same job it has on the operator
+ * side. Now that it shares a family with the body, its weight and size are the
+ * only things holding it apart from a card heading, so neither may drift.
  */
 .rq-title {
-  font-family: var(--rq-serif);
-  font-variation-settings: var(--rq-fraunces-axes);
+  font-family: var(--rq-display);
   font-size: var(--text-display-4);
   font-weight: 600;
   line-height: 1.1;
@@ -189,8 +187,7 @@
 }
 
 .rq-hero h1 {
-  font-family: var(--rq-serif);
-  font-variation-settings: var(--rq-fraunces-axes);
+  font-family: var(--rq-display);
   font-size: var(--text-display-5);
   line-height: 1.05;
   letter-spacing: -0.02em;

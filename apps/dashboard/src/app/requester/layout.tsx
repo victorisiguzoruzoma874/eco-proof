@@ -1,11 +1,11 @@
-import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Poppins } from "next/font/google";
 import { cookies } from "next/headers";
 import { REQUESTER_TOKEN_COOKIE } from "@/lib/api";
 import { RequesterTabs } from "./RequesterTabs";
 import "./requester.css";
 
 /*
- * The same three faces as the operator dashboard — see `docs/typography.md`.
+ * The same two faces as the operator dashboard — see `docs/typography.md`.
  *
  * A household and an auditor are different audiences, but they are looking at
  * the same company's numbers, and a second type system made that seam visible
@@ -13,23 +13,22 @@ import "./requester.css";
  * products is weight, scale and colour, which is where the difference belongs.
  */
 
-/* The screen title on each page, and nothing else. */
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
-  variable: "--rq-font-display",
-});
-
-/* Everything a requester reads, their balance included. */
-const plexSans = IBM_Plex_Sans({
+/*
+ * Everything a requester reads: the screen title, their balance, every card.
+ *
+ * Poppins covers display and text alike, so `requester.css` aliases its own
+ * display token to this one rather than loading a second family.
+ */
+const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--rq-font-sans",
 });
 
 /*
- * A redemption code, typed back in from a printed slip — the one place in this
- * app where a person has to get every character right.
+ * A redemption code, scanned or typed back in off a collector's screen — the
+ * one place in this app where a person has to get every character right, which
+ * is why it stayed monospaced when everything around it became Poppins.
  */
 const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
@@ -62,7 +61,7 @@ export default async function RequesterLayout({ children }: { children: React.Re
   const hasSession = Boolean((await cookies()).get(REQUESTER_TOKEN_COOKIE)?.value);
 
   return (
-    <div className={`rq-shell ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
+    <div className={`rq-shell ${poppins.variable} ${plexMono.variable}`}>
       <div className="rq-body">
         {hasSession ? <RequesterTabs /> : null}
         <main className="rq-main">{children}</main>

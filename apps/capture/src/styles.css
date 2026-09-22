@@ -65,24 +65,25 @@
    * on every phone in the fleet. Naming the face is what makes the readout the
    * same object in every collector's hand.
    *
-   *   --font   IBM Plex Sans  everything, the weight numeral included
-   *   --serif  Fraunces       the wordmark. Nowhere else — there is no
-   *                           editorial writing on a field instrument.
-   *   --mono   IBM Plex Mono  machine strings: the device key, a lookup code
+   *   --font     Poppins        everything, the weight numeral included
+   *   --display  Poppins        the wordmark — aliased, not a second face
+   *   --mono     IBM Plex Mono  machine strings: the device key, a lookup code,
+   *                             the redemption code the requester scans
    *
    * The mono is a real face here rather than the system stack it used to fall
-   * back to. A collector reads a lookup code off this screen and types it into
-   * a paper slip or reads it down a phone line; leaving that to whatever
-   * monospace the handset happened to ship meant the one string that has to be
-   * transcribed exactly looked different on every phone in the fleet.
+   * back to, and it is the one thing that did NOT move to Poppins. A collector
+   * reads a lookup code off this screen and types it into a paper slip, and a
+   * requester reads an eight-character redemption code off it at the door.
+   * Poppins has no monospace cut, and a proportional face is the wrong tool for
+   * a string transcribed character by character.
    *
-   * The weight is NOT mono. A weight is a quantity, and it is set in Plex Sans
-   * with tabular figures — which is what actually keeps the digits from
-   * jittering as the scale settles.
+   * The weight is NOT mono. A weight is a quantity, set in Poppins with tabular
+   * figures — which is what keeps the digits from jittering as the scale
+   * settles.
    */
-  --font: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+  --font: Poppins, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     sans-serif;
-  --serif: "Fraunces Variable", ui-serif, Georgia, "Iowan Old Style", serif;
+  --display: var(--font);
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
 }
 
@@ -188,7 +189,7 @@ body {
    than instrument: `ProofChain` in the display face, `capture` in the text face
    beside it — the same construction as the dashboard's wordmark. */
 .wordmark {
-  font-family: var(--serif);
+  font-family: var(--display);
   /* Sharp terminals, no swash alternates — the product-wide setting. */
   font-variation-settings: "SOFT" 0, "WONK" 0;
   font-size: var(--text-lg);
@@ -315,11 +316,16 @@ main {
  * read this one number wrong-side-up in the sun, so it is the only place that
  * spends any size at all.
  *
- * Sans, not mono: a kilogram is a quantity, not a machine string, and
- * `tabular-nums` is what stops the digits shifting sideways as the scale
- * settles — the monospacing was never what did that, it just also made the
- * number look like a serial code. Plex Sans's digits are open in the counter
- * and even in weight, which is what survives glare at arm's length.
+ * Sans, not mono: a kilogram is a quantity, not a machine string. Poppins'
+ * digits are open in the counter and even in weight, which is what survives
+ * glare at arm's length.
+ *
+ * KNOWN GAP: `tabular-nums` below is currently a no-op. Poppins ships no
+ * `tnum` feature and its figures are proportional — `1` is 320 units against
+ * `0` at 628 — so this readout shifts sideways as the scale settles, which is
+ * exactly what the declaration is here to prevent. It is left in place because
+ * it is correct and costs nothing the moment the face gains the feature or is
+ * swapped. See `docs/typography.md` for the options.
  */
 .readout input {
   font-family: var(--font);

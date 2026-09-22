@@ -16,19 +16,20 @@
  * service worker would faithfully cache forever and no collector would ever
  * render a glyph from.
  *
- * The wordmark is the only serif on the screen, so Fraunces comes in on its
- * `wght` axis alone: no italic, no optical-size range, no `SOFT`/`WONK`
- * alternates. On a metered SIM those axes are bytes spent on two words.
+ * Poppins now carries the wordmark as well as the body, so the separate
+ * display face this screen used to load is gone entirely — one family fewer to
+ * ship down a metered SIM.
  */
-import "@fontsource-variable/fraunces/wght.css";
 /* 400 for body, plus the three weights this screen actually sets. Audited
    against `styles.css` rather than imported wholesale — each unused cut is
    ~23 kB the service worker would cache forever on a field phone. */
-import "@fontsource/ibm-plex-sans/latin-400.css";
-import "@fontsource/ibm-plex-sans/latin-500.css";
-import "@fontsource/ibm-plex-sans/latin-600.css";
-import "@fontsource/ibm-plex-sans/latin-700.css";
-/* One weight of mono, for the device key and the lookup code. */
+import "@fontsource/poppins/latin-400.css";
+import "@fontsource/poppins/latin-500.css";
+import "@fontsource/poppins/latin-600.css";
+import "@fontsource/poppins/latin-700.css";
+/* One weight of mono, for the device key, the lookup code and the redemption
+   code the requester scans off this screen. Deliberately not Poppins: it has
+   no monospace cut, and these are the strings someone transcribes by hand. */
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import "./styles.css";
 import { type MaterialType, type WeighInPayload } from "@shared/types";
