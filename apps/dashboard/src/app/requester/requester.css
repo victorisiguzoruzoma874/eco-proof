@@ -880,7 +880,7 @@
    `.rq-hero`'s dark background, so it's overridden just within the hero. */
 .rq-hero a {
   color: #faf9f4;
-  text-decoration: underline;
+  text-decoration: none;
 }
 .rq-hero a:hover {
   color: var(--rq-accent-2);
