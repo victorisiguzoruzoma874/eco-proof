@@ -105,7 +105,15 @@ export default async function ReweighPage({
           hub-verified weight.
         </p>
 
-      <form className="confirm-body" style={{ maxWidth: "36rem" }}>
+      {/*
+       * `.confirm-body` is absolutely positioned against a row so it can drop
+       * down over a table (see globals.css) — used here as a static page
+       * form, it pinned itself to the right edge of the shell instead of
+       * sitting in the flow under the paragraph above it. `.page-form` is
+       * the in-flow card the same fix already uses on /materials and
+       * /material-rates.
+       */}
+      <form className="page-form" style={{ maxWidth: "36rem" }}>
         <label htmlFor="eventId">
           Lookup code or weigh-in id
           <input
@@ -212,7 +220,7 @@ export default async function ReweighPage({
           ) : (
             <>
               <h2>Record a reweigh</h2>
-              <form action={submitReweigh} className="confirm-body" style={{ maxWidth: "36rem" }}>
+              <form action={submitReweigh} className="page-form" style={{ maxWidth: "36rem" }}>
                 <input type="hidden" name="eventId" value={event.id} />
                 <label htmlFor="verifiedWeightKg">
                   Verified weight in kg (what the hub scale reads)
