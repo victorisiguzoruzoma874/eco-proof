@@ -254,7 +254,15 @@ export default async function RequesterDashboardPage({
         </section>
       ) : null}
 
-      <div className="rq-grid">
+      {/*
+       * Rates and requests stack in reading order, not side by side: a
+       * requester checks the rate for a material, then looks below it for
+       * where their own pickups stand. `.rq-grid` (used above, and on
+       * history/wallet) is the shared two-up layout for pairs of blocks
+       * that are independent of each other; these two aren't, so they get
+       * a plain stack instead of that class.
+       */}
+      <div>
         <section className="rq-section">
           <h2>Today&rsquo;s rates</h2>
           {defaultRates.length === 0 ? (
