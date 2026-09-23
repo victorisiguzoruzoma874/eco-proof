@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { requesterSignOut } from "./sign-out";
+import { ThemeToggle } from "./ThemeToggle";
 
 const TABS = [
   { href: "/requester/dashboard", label: "Home" },
@@ -38,6 +39,7 @@ export function RequesterTabs() {
           {tab.label}
         </Link>
       ))}
+      <ThemeToggle />
       {/* A form because the session cookie is httpOnly; see sign-out.ts. */}
       <form action={requesterSignOut} className="rq-signout">
         <button type="submit" className="rq-tab">

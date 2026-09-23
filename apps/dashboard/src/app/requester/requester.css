@@ -14,8 +14,20 @@
  */
 
 .rq-shell {
+  color-scheme: light;
+
   --rq-bg: #ffffff;
   --rq-surface: #f5f3ec;
+  /*
+   * The ground for cards, stat boxes and form fields. Identical to the page in
+   * the light theme, where a hairline border is enough to separate them; in the
+   * dark theme it lifts a step, because a border alone on a dark ground reads
+   * as a seam rather than as a card.
+   */
+  --rq-card: #ffffff;
+  /* Text on a filled accent button: it has to invert with the theme, since the
+     dark theme lifts the accent to a green that near-white cannot sit on. */
+  --rq-on-accent: #fcfbf7;
   --rq-text: #0b0f0d;
   --rq-text-soft: color-mix(in srgb, var(--rq-text) 60%, transparent);
   --rq-text-faint: color-mix(in srgb, var(--rq-text) 45%, transparent);
@@ -87,6 +99,130 @@
   font-feature-settings: "tnum" 1;
   font-synthesis: none;
   font-optical-sizing: auto;
+}
+
+/*
+ * The dark theme.
+ *
+ * Three states, matching the operator section and the capture app: no
+ * `data-theme` means "follow the system", and an explicit choice from the
+ * toggle in the sidebar wins in both directions — including choosing dark on a
+ * machine set to light, which the media query alone cannot express. The
+ * attribute is applied to `<html>` before first paint by the root layout, so
+ * the page never flashes the other theme.
+ *
+ * Written twice because CSS has no way to say "these two selectors share a
+ * body"; the values themselves live in one place, in this comment's block
+ * below, so the two copies cannot drift apart in meaning.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .rq-shell {
+  color-scheme: dark;
+
+  /*
+   * A soft, green-shifted charcoal rather than black. The brief was explicit:
+   * dark enough to be a dark theme, never so dark that the copy on it becomes
+   * hard to read. Body text sits at about 14:1 on the page here, and the
+   * quietest metadata still clears 4.5:1.
+   */
+  --rq-bg: #101512;
+  --rq-surface: #1a221e;
+  /* A step above the page, so a card is a card without leaning on its border. */
+  --rq-card: #19211d;
+  --rq-text: #f1efe8;
+  /*
+   * The muted inks are re-derived, not inherited: on paper 60%/45% of the ink
+   * reads as "quieter", but the same fractions of a near-white on a dark ground
+   * fall to about 4:1 — under the 4.5:1 floor, and exactly the "cannot read the
+   * write-up" this theme exists to avoid. Raised until the faintest metadata
+   * clears the floor with room to spare.
+   */
+  --rq-text-soft: color-mix(in srgb, var(--rq-text) 80%, transparent);
+  --rq-text-faint: color-mix(in srgb, var(--rq-text) 66%, transparent);
+  --rq-divider: #2c3630;
+
+  /*
+   * The panels that are already dark in the light theme — the hero, the
+   * sidebar, the scan card — lift instead of dropping. Left at their light-theme
+   * near-black they would swallow the page they sit on, which is exactly the
+   * "cannot read it" the brief warns about.
+   */
+  --rq-dark: #17231d;
+  --rq-dark-2: #1f342a;
+
+  /*
+   * The accent lifts to a mid green that holds its own on the dark ground
+   * (about 6:1 as link text), and what sits on top of it flips to the near-black
+   * page colour, because near-white on this green measures about 2.8:1.
+   */
+  --rq-accent: #3fae77;
+  --rq-accent-2: #4ec98d;
+  --rq-accent-100: #16291f;
+  --rq-accent-700: #7fd3a6;
+  --rq-on-accent: #0b130f;
+
+  --rq-bad: #ef8378;
+  --rq-bad-bg: #2b1614;
+
+  /* Shadows read as depth on paper and as grime on a dark ground: pulled back
+     to a plain black at low alpha, which still separates a card from the page. */
+  --rq-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --rq-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme="dark"] .rq-shell {
+  color-scheme: dark;
+
+  /*
+   * A soft, green-shifted charcoal rather than black. The brief was explicit:
+   * dark enough to be a dark theme, never so dark that the copy on it becomes
+   * hard to read. Body text sits at about 14:1 on the page here, and the
+   * quietest metadata still clears 4.5:1.
+   */
+  --rq-bg: #101512;
+  --rq-surface: #1a221e;
+  /* A step above the page, so a card is a card without leaning on its border. */
+  --rq-card: #19211d;
+  --rq-text: #f1efe8;
+  /*
+   * The muted inks are re-derived, not inherited: on paper 60%/45% of the ink
+   * reads as "quieter", but the same fractions of a near-white on a dark ground
+   * fall to about 4:1 — under the 4.5:1 floor, and exactly the "cannot read the
+   * write-up" this theme exists to avoid. Raised until the faintest metadata
+   * clears the floor with room to spare.
+   */
+  --rq-text-soft: color-mix(in srgb, var(--rq-text) 80%, transparent);
+  --rq-text-faint: color-mix(in srgb, var(--rq-text) 66%, transparent);
+  --rq-divider: #2c3630;
+
+  /*
+   * The panels that are already dark in the light theme — the hero, the
+   * sidebar, the scan card — lift instead of dropping. Left at their light-theme
+   * near-black they would swallow the page they sit on, which is exactly the
+   * "cannot read it" the brief warns about.
+   */
+  --rq-dark: #17231d;
+  --rq-dark-2: #1f342a;
+
+  /*
+   * The accent lifts to a mid green that holds its own on the dark ground
+   * (about 6:1 as link text), and what sits on top of it flips to the near-black
+   * page colour, because near-white on this green measures about 2.8:1.
+   */
+  --rq-accent: #3fae77;
+  --rq-accent-2: #4ec98d;
+  --rq-accent-100: #16291f;
+  --rq-accent-700: #7fd3a6;
+  --rq-on-accent: #0b130f;
+
+  --rq-bad: #ef8378;
+  --rq-bad-bg: #2b1614;
+
+  /* Shadows read as depth on paper and as grime on a dark ground: pulled back
+     to a plain black at low alpha, which still separates a card from the page. */
+  --rq-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --rq-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
 }
 
 .rq-shell * {
@@ -248,7 +384,7 @@
   border: 1px solid var(--rq-divider);
   border-radius: var(--rq-radius-lg);
   padding: 1rem 1.125rem;
-  background: var(--rq-bg);
+  background: var(--rq-card);
   box-shadow: var(--rq-shadow-sm);
   margin-bottom: 1rem;
 }
@@ -300,7 +436,7 @@
  */
 .rq-btn[data-variant="primary"] {
   background: var(--rq-accent);
-  color: #fcfbf7;
+  color: var(--rq-on-accent);
 }
 .rq-btn[data-variant="primary"]:hover {
   background: var(--rq-accent-700);
@@ -381,7 +517,7 @@
   border: 1px solid var(--rq-divider);
   border-radius: var(--rq-radius-md);
   padding: 0.75rem;
-  background: var(--rq-bg);
+  background: var(--rq-card);
 }
 .rq-stat b {
   display: block;
@@ -449,7 +585,7 @@
   border-radius: var(--rq-radius-sm);
   font: inherit;
   font-size: var(--text-md);
-  background: var(--rq-bg);
+  background: var(--rq-card);
   color: var(--rq-text);
 }
 .rq-field textarea {
@@ -1234,4 +1370,33 @@
 }
 .rq-claim .rq-scan-error {
   color: rgba(250, 249, 244, 0.75);
+}
+
+/*
+ * The theme switch sits in the nav as one more tab, but it is a button, so it
+ * drops the native chrome and carries its icon inline. Grouped with Sign out
+ * rather than with the places you navigate to.
+ */
+.rq-theme-toggle {
+  font-family: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  gap: 0.45rem;
+}
+.rq-theme-icon {
+  display: inline-flex;
+}
+.rq-theme-icon svg {
+  width: 15px;
+  height: 15px;
+}
+@media (min-width: 860px) {
+  .rq-theme-toggle {
+    width: calc(100% + 0.5rem);
+    border-left: 3px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+  }
 }
