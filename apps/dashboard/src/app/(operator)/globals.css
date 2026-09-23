@@ -791,7 +791,7 @@ h3 {
 .segmented {
   display: inline-flex;
   align-items: stretch;
-  padding: var(--space-1);
+  padding: var(--space-2);
   gap: var(--space-1);
   background: var(--paper-sunk);
   border: 1px solid var(--rule);
