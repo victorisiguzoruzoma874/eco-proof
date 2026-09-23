@@ -256,6 +256,37 @@ export default async function RequesterDashboardPage({
 
       <div className="rq-grid">
         <section className="rq-section">
+          <h2>Today&rsquo;s rates</h2>
+          {defaultRates.length === 0 ? (
+            <p className="rq-note">No published rates yet.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="rq-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th className="num">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {defaultRates.map((rate) => (
+                    <tr key={rate.id}>
+                      <td>
+                        <Emoji>{materialEmoji(rate.materialCode)}</Emoji> {rate.materialCode}
+                      </td>
+                      <td className="num">
+                        {Number(rate.creditsPerKg).toLocaleString()} credits/kg (
+                        {formatNaira(rate.creditsPerKg)}/kg)
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="rq-section">
           <h2>Your requests</h2>
         {requests.length === 0 ? (
           <p className="rq-note">No pickups requested yet.</p>
@@ -293,37 +324,6 @@ export default async function RequesterDashboardPage({
             </table>
           </div>
         )}
-        </section>
-
-        <section className="rq-section">
-          <h2>Today&rsquo;s rates</h2>
-          {defaultRates.length === 0 ? (
-            <p className="rq-note">No published rates yet.</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="rq-table">
-                <thead>
-                  <tr>
-                    <th>Material</th>
-                    <th className="num">Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {defaultRates.map((rate) => (
-                    <tr key={rate.id}>
-                      <td>
-                        <Emoji>{materialEmoji(rate.materialCode)}</Emoji> {rate.materialCode}
-                      </td>
-                      <td className="num">
-                        {Number(rate.creditsPerKg).toLocaleString()} credits/kg (
-                        {formatNaira(rate.creditsPerKg)}/kg)
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </section>
       </div>
     </>
