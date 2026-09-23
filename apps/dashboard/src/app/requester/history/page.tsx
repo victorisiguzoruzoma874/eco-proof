@@ -92,83 +92,88 @@ export default async function RequesterHistoryPage() {
 
       <div className="rq-grid">
         <div>
-      <h2>Your pickups</h2>
-      {sortedRequests.length === 0 ? (
-        <p style={{ color: "var(--rq-text-soft)" }}>No pickups yet.</p>
-      ) : (
-        <div className="rq-card" style={{ overflowX: "auto" }}>
-          <table className="rq-table">
-            <thead>
-              <tr>
-                <th>Material</th>
-                <th>Status</th>
-                <th className="num">Est. weight</th>
-                <th>Requested</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRequests.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <Emoji>{materialEmoji(r.material)}</Emoji> {r.material}
-                  </td>
-                  <td>
-                    <span className="rq-pill" data-tone={requestStatusTone(r.status)}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="num">
-                    {r.estimatedWeightKg == null ? "—" : `${formatKg(r.estimatedWeightKg)} kg`}
-                  </td>
-                  <td>{formatDateTime(r.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+          <h2 style={{ margin: "0 0 0.75rem" }}>Your pickups</h2>
+          {sortedRequests.length === 0 ? (
+            <div className="rq-card">
+              <p style={{ color: "var(--rq-text-soft)", margin: 0 }}>No pickups yet.</p>
+            </div>
+          ) : (
+            <div className="rq-card" style={{ overflowX: "auto" }}>
+              <table className="rq-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Status</th>
+                    <th className="num">Est. weight</th>
+                    <th>Requested</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedRequests.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <Emoji>{materialEmoji(r.material)}</Emoji> {r.material}
+                      </td>
+                      <td>
+                        <span className="rq-pill" data-tone={requestStatusTone(r.status)}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="num">
+                        {r.estimatedWeightKg == null ? "—" : `${formatKg(r.estimatedWeightKg)} kg`}
+                      </td>
+                      <td>{formatDateTime(r.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div>
-      <h2>Wallet transactions</h2>
-      {sortedTransactions.length === 0 ? (
-        <p style={{ color: "var(--rq-text-soft)" }}>No transactions yet.</p>
-      ) : (
-        <div className="rq-card" style={{ overflowX: "auto" }}>
-          <table className="rq-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th className="num">Amount</th>
-                <th>Description</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTransactions.map((t) => (
-                <tr key={t.id}>
-                  <td>
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: t.type === "credit" ? "var(--rq-accent-700)" : "var(--rq-text-soft)",
-                      }}
-                    >
-                      {t.type}
-                    </span>
-                  </td>
-                  <td className="num">
-                    {t.type === "credit" ? "+" : "−"}
-                    {Number(t.amountCredits).toLocaleString()} credits
-                  </td>
-                  <td>{t.description ?? "—"}</td>
-                  <td>{formatDateTime(t.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+          <h2 style={{ margin: "0 0 0.75rem" }}>Wallet transactions</h2>
+          {sortedTransactions.length === 0 ? (
+            <div className="rq-card">
+              <p style={{ color: "var(--rq-text-soft)", margin: 0 }}>No transactions yet.</p>
+            </div>
+          ) : (
+            <div className="rq-card" style={{ overflowX: "auto" }}>
+              <table className="rq-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th className="num">Amount</th>
+                    <th>Description</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTransactions.map((t) => (
+                    <tr key={t.id}>
+                      <td>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color:
+                              t.type === "credit" ? "var(--rq-accent-700)" : "var(--rq-text-soft)",
+                          }}
+                        >
+                          {t.type}
+                        </span>
+                      </td>
+                      <td className="num">
+                        {t.type === "credit" ? "+" : "−"}
+                        {Number(t.amountCredits).toLocaleString()} credits
+                      </td>
+                      <td>{t.description ?? "—"}</td>
+                      <td>{formatDateTime(t.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
