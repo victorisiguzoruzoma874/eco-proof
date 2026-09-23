@@ -214,7 +214,7 @@ export default async function PayoutsPage({
             another payout, and a rate must exist for its material, otherwise the request is
             refused and the reason is shown below.
           </p>
-          <form action={createPayoutAction} className="confirm-body">
+          <form action={createPayoutAction} className="page-form">
             <label htmlFor="collectorId">
               Collector
               <select id="collectorId" name="collectorId" required defaultValue="">
