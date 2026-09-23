@@ -26,6 +26,7 @@ const PRIMARY = [
 ] as const;
 
 const MORE = [
+  { href: "/collectors", label: "Collectors" },
   { href: "/material-rates", label: "Material rates" },
   { href: "/materials", label: "Materials" },
   { href: "/catalog-items", label: "Catalog items" },

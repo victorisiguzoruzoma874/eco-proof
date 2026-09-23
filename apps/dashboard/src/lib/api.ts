@@ -273,6 +273,16 @@ export interface Material {
   sortOrder: number;
 }
 
+export interface Collector {
+  id: string;
+  name: string;
+  phone: string;
+  cooperativeId: string | null;
+  kycLevel: "none" | "basic" | "verified";
+  active: boolean;
+  createdAt: string;
+}
+
 export interface CurrentUser {
   id: string;
   email: string;
@@ -440,7 +450,13 @@ export const api = {
     request<CollectionEvent>(`/events/by-code/${encodeURIComponent(code)}`),
   report: (id: string) => request<AuditReport>(`/batches/${id}/report`),
   hubs: () => request<{ id: string; code: string; name: string }[]>("/hubs"),
-  collectors: () => request<{ id: string; name: string }[]>("/collectors"),
+  collectors: () => request<Collector[]>("/collectors"),
+  createCollector: (body: {
+    name: string;
+    phone: string;
+    cooperativeId?: string;
+    kycLevel?: "none" | "basic" | "verified";
+  }) => request<Collector>("/collectors", { method: "POST", body: JSON.stringify(body) }),
   recordReweigh: (eventId: string, body: { verifiedWeightKg: number; notes?: string }) =>
     request<EventReweigh>(`/events/${eventId}/reweigh`, {
       method: "POST",
