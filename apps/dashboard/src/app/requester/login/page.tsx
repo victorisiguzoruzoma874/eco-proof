@@ -50,39 +50,41 @@ export default async function RequesterLoginPage({
           with the form or copy for attention. */}
       <img className="rq-login-bg" src="/illustrations/login-bg.gif" alt="" aria-hidden="true" />
 
-      <div className="rq-card" style={{ marginTop: "2.5rem", position: "relative", zIndex: 1 }}>
-      <p className="rq-eyebrow">Requester access</p>
-      <h1 style={{ margin: "0 0 1.25rem", fontSize: "1.5rem" }}>Sign in</h1>
+      <div style={{ maxWidth: "26rem", margin: "0 auto", position: "relative", zIndex: 1 }}>
+        <div className="rq-card" style={{ marginTop: "2.5rem" }}>
+          <p className="rq-eyebrow">Requester access</p>
+          <h1 style={{ margin: "0 0 1.25rem", fontSize: "1.5rem" }}>Sign in</h1>
 
-      {error ? (
-        <p className="rq-error">Those credentials were not accepted.</p>
-      ) : signedOut ? (
-        <p className="rq-note">You have signed out.</p>
-      ) : null}
+          {error ? (
+            <p className="rq-error">Those credentials were not accepted.</p>
+          ) : signedOut ? (
+            <p className="rq-note">You have signed out.</p>
+          ) : null}
 
-      <form action={signIn}>
-        <label className="rq-field">
-          Email
-          <input name="email" type="email" required autoComplete="username" />
-        </label>
-        <label className="rq-field">
-          Password
-          <input name="password" type="password" required autoComplete="current-password" />
-        </label>
-        <button
-          className="rq-btn"
-          data-variant="primary"
-          type="submit"
-          style={{ justifyContent: "center" }}
-        >
-          Sign in
-        </button>
-      </form>
+          <form action={signIn}>
+            <label className="rq-field">
+              Email
+              <input name="email" type="email" required autoComplete="username" />
+            </label>
+            <label className="rq-field">
+              Password
+              <input name="password" type="password" required autoComplete="current-password" />
+            </label>
+            <button
+              className="rq-btn"
+              data-variant="primary"
+              type="submit"
+              style={{ justifyContent: "center" }}
+            >
+              Sign in
+            </button>
+          </form>
 
-      <p style={{ marginTop: "1.25rem", fontSize: "0.875rem", textAlign: "center" }}>
-        New here? <Link href="/requester/signup">Create an account</Link> to request a pickup and
-        earn waste credits.
-      </p>
+          <p style={{ marginTop: "1.25rem", fontSize: "0.875rem", textAlign: "center" }}>
+            New here? <Link href="/requester/signup">Create an account</Link> to request a
+            pickup and earn waste credits.
+          </p>
+        </div>
       </div>
     </>
   );
