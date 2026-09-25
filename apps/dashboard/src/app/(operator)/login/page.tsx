@@ -42,7 +42,11 @@ export default async function LoginPage({
   const { error, signedOut } = await searchParams;
 
   return (
-    <main style={{ maxWidth: "26rem", margin: "0 auto" }}>
+    <main style={{ maxWidth: "26rem", margin: "0 auto", position: "relative", zIndex: 1 }}>
+      {/* Decorative — sits behind the form via `.login-bg`, never competing
+          with the fields or copy for attention. */}
+      <img className="login-bg" src="/illustrations/login-bg.gif" alt="" aria-hidden="true" />
+
       <PageHeader eyebrow="Operator access" title="Sign in" />
 
       {error ? (
