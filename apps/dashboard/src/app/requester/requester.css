@@ -1250,7 +1250,7 @@
   }
   .rq-claim-media {
     display: block;
-    justify-self: end;
+    justify-self: center;
     align-self: center;
     width: 100%;
     height: auto;
