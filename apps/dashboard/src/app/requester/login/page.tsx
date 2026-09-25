@@ -45,7 +45,12 @@ export default async function RequesterLoginPage({
   const { error, signedOut } = await searchParams;
 
   return (
-    <div className="rq-card" style={{ marginTop: "2.5rem" }}>
+    <>
+      {/* Decorative — sits behind the card via `.rq-login-bg`, never competing
+          with the form or copy for attention. */}
+      <img className="rq-login-bg" src="/illustrations/login-bg.gif" alt="" aria-hidden="true" />
+
+      <div className="rq-card" style={{ marginTop: "2.5rem", position: "relative", zIndex: 1 }}>
       <p className="rq-eyebrow">Requester access</p>
       <h1 style={{ margin: "0 0 1.25rem", fontSize: "1.5rem" }}>Sign in</h1>
 
@@ -78,6 +83,7 @@ export default async function RequesterLoginPage({
         New here? <Link href="/requester/signup">Create an account</Link> to request a pickup and
         earn waste credits.
       </p>
-    </div>
+      </div>
+    </>
   );
 }

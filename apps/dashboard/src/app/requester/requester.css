@@ -389,6 +389,24 @@
   margin-bottom: 1rem;
 }
 
+/*
+ * The sign-in page's decorative loop — same technique as the operator
+ * `/login`'s `.login-bg`: fixed to the viewport, z-index: 0 under the
+ * (opaque, z-index: 1) card, pointer-events: none. Opacity is a step
+ * higher than the operator version since there's no topbar/nav competing
+ * for attention on this screen.
+ */
+.rq-login-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.18;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .rq-section {
   padding: 1rem 0;
   border-top: 1px solid var(--rq-divider);
