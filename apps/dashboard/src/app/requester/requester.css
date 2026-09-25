@@ -1245,16 +1245,17 @@
 }
 @media (min-width: 860px) {
   .rq-claim {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr minmax(160px, 45%);
     align-items: center;
   }
   .rq-claim-media {
     display: block;
     justify-self: end;
     align-self: center;
-    width: 128px;
-    height: 128px;
-    max-width: 100%;
+    width: 100%;
+    height: auto;
+    max-width: 260px;
+    aspect-ratio: 1 / 1;
     border-radius: 50%;
     object-fit: cover;
   }

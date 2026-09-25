@@ -211,8 +211,8 @@ export default async function RequesterDashboardPage({
           src="/illustrations/collector-scan.gif"
           alt=""
           aria-hidden="true"
-          width={160}
-          height={160}
+          width={260}
+          height={260}
         />
       </section>
 
