@@ -152,55 +152,68 @@ export default async function RequesterDashboardPage({
         done with someone waiting: the collector is holding their phone out.
       */}
       <section className="rq-claim" id="scan" aria-labelledby="scan-title">
-        <div>
-          <p className="rq-eyebrow">Dropped off at a collector?</p>
-          <h2 id="scan-title">Scan to get credited</h2>
-        </div>
-        <p className="rq-claim-lede">
-          After your material is weighed, the collector shows a QR code on their phone. Scan it
-          here and the weight goes straight into your wallet as credits. Each code can be claimed
-          once.
-        </p>
-
-        {credited ? (
-          <div className="rq-credited" role="status">
-            <strong>+{Number(credited).toLocaleString()} credits</strong>
-            {what ? <p>{what}</p> : null}
-            {balance ? (
-              <p>
-                New balance: {Number(balance).toLocaleString()} credits ({formatNaira(Number(balance))})
-              </p>
-            ) : null}
+        <div className="rq-claim-body">
+          <div>
+            <p className="rq-eyebrow">Dropped off at a collector?</p>
+            <h2 id="scan-title">Scan to get credited</h2>
           </div>
-        ) : null}
-        {claimError ? (
-          <p className="rq-claim-error" role="alert">
-            {claimError}
+          <p className="rq-claim-lede">
+            After your material is weighed, the collector shows a QR code on their phone. Scan it
+            here and the weight goes straight into your wallet as credits. Each code can be claimed
+            once.
           </p>
-        ) : null}
 
-        {/* Fills #claimCode and submits the form below through its own action. */}
-        <ScanButton targetInputId="claimCode" autoSubmit primary label="Scan QR code" />
+          {credited ? (
+            <div className="rq-credited" role="status">
+              <strong>+{Number(credited).toLocaleString()} credits</strong>
+              {what ? <p>{what}</p> : null}
+              {balance ? (
+                <p>
+                  New balance: {Number(balance).toLocaleString()} credits ({formatNaira(Number(balance))})
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {claimError ? (
+            <p className="rq-claim-error" role="alert">
+              {claimError}
+            </p>
+          ) : null}
 
-        <form action={claimAction} className="rq-claim-form">
-          <label htmlFor="claimCode">
-            Or type the code under the QR
-            <input
-              id="claimCode"
-              name="code"
-              required
-              maxLength={16}
-              placeholder="K7M2Q-RT9XA"
-              autoCapitalize="characters"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </label>
-          <button className="rq-btn" data-variant="on-dark" type="submit">
-            Claim
-          </button>
-        </form>
+          {/* Fills #claimCode and submits the form below through its own action. */}
+          <ScanButton targetInputId="claimCode" autoSubmit primary label="Scan QR code" />
+
+          <form action={claimAction} className="rq-claim-form">
+            <label htmlFor="claimCode">
+              Or type the code under the QR
+              <input
+                id="claimCode"
+                name="code"
+                required
+                maxLength={16}
+                placeholder="K7M2Q-RT9XA"
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </label>
+            <button className="rq-btn" data-variant="on-dark" type="submit">
+              Claim
+            </button>
+          </form>
+        </div>
+
+        {/* Decorative — the collector-and-bin loop just illustrates the flow
+            described in the copy, so it's hidden from assistive tech. */}
+        <img
+          className="rq-claim-media"
+          src="/illustrations/collector-scan.gif"
+          alt=""
+          aria-hidden="true"
+          width={160}
+          height={160}
+        />
       </section>
 
       <div className="rq-grid">

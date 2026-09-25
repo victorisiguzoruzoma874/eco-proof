@@ -1229,6 +1229,35 @@
   margin: 0 0 1rem;
   display: grid;
   gap: 0.875rem;
+  overflow: hidden;
+}
+.rq-claim-body {
+  display: grid;
+  gap: 0.875rem;
+  min-width: 0;
+}
+/* Purely decorative loop illustrating the scan flow — kept inside the card's
+   own padding box (not pinned/oversized) so it never bleeds into the section
+   below it. Hidden below the desktop breakpoint rather than shrunk further,
+   since the form already needs the full width on a phone. */
+.rq-claim-media {
+  display: none;
+}
+@media (min-width: 860px) {
+  .rq-claim {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  .rq-claim-media {
+    display: block;
+    justify-self: end;
+    align-self: center;
+    width: 128px;
+    height: 128px;
+    max-width: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+  }
 }
 .rq-claim h2 {
   margin: 0;
