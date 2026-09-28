@@ -1,12 +1,11 @@
 /*
- * The requester's app: a different product for a different audience.
- *
- * The operator side (globals.css) is deliberately editorial — a ledger, not
- * an admin panel. This side is the opposite on purpose: a consumer product a
- * household member opens on their phone to book a pickup and watch a wallet
- * balance grow. Warm surfaces, a bold display weight, tabular numerals on
- * every amount, and a mobile-app layout (capped width, bottom tab bar) even
- * though it renders in a desktop browser too.
+ * The requester's app: a different product for a different audience — but the
+ * same field instrument the capture app and the operator ledger now share.
+ * The consumer framing stays (a household member on their phone, a wallet
+ * balance to watch grow, a mobile-app layout with a bottom tab bar), but the
+ * surfaces, rule weights and one saturated lime signal are the same tokens
+ * used everywhere else in the product, so a requester and a collector are
+ * unmistakably looking at one thing.
  *
  * Scoped entirely under `.rq-shell` (applied once, in requester/layout.tsx)
  * so nothing here can leak into `(operator)/globals.css` or vice versa —
@@ -16,35 +15,51 @@
 .rq-shell {
   color-scheme: light;
 
-  --rq-bg: #ffffff;
-  --rq-surface: #f5f3ec;
+  --rq-bg: #f4f2ec;
+  --rq-surface: #e6e4dd;
   /*
-   * The ground for cards, stat boxes and form fields. Identical to the page in
-   * the light theme, where a hairline border is enough to separate them; in the
-   * dark theme it lifts a step, because a border alone on a dark ground reads
-   * as a seam rather than as a card.
+   * The ground for cards, stat boxes and form fields. A surface a shade above
+   * the page in both themes, since a hairline alone reads as a seam rather
+   * than a card once the border stops being the loudest thing near it.
    */
   --rq-card: #ffffff;
-  /* Text on a filled accent button: it has to invert with the theme, since the
-     dark theme lifts the accent to a green that near-white cannot sit on. */
-  --rq-on-accent: #fcfbf7;
-  --rq-text: #0b0f0d;
+  /* Text on the lime signal button. Fixed in both themes on purpose — see
+     `--rq-signal` below — so this never needs to invert with the palette. */
+  --rq-on-accent: #111311;
+  --rq-text: #111311;
   --rq-text-soft: color-mix(in srgb, var(--rq-text) 60%, transparent);
   --rq-text-faint: color-mix(in srgb, var(--rq-text) 45%, transparent);
-  --rq-divider: #d9d8d1;
+  /* The quiet rule, for hairlines inside an already-bordered card. */
+  --rq-divider: #d8d5cc;
+  /* The loud rule: near-black, drawn wherever an edge is a card boundary
+     rather than a row divider — same split as the operator ledger's
+     `--rule`/`--rule-soft`. */
+  --rq-rule: #111311;
   --rq-accent: #0f6b45;
   --rq-accent-2: #35b879;
   --rq-accent-100: #e6f4ec;
   --rq-accent-700: #0a4a30;
+  /*
+   * The recovered-material lime — the one saturated accent, reserved for the
+   * thing you press (a primary button, a focus ring), same role it has in the
+   * capture app and never used for a status or a link. Fixed across both
+   * themes: the signal does not need to invert, so `--rq-on-accent` doesn't
+   * either.
+   */
+  --rq-signal: #c8f000;
   --rq-dark: #0b1f16;
   --rq-dark-2: #123c2a;
   --rq-bad: #a8261d;
   --rq-bad-bg: #fbeae8;
-  --rq-radius-sm: 8px;
-  --rq-radius-md: 12px;
-  --rq-radius-lg: 16px;
-  --rq-shadow-sm: 0 1px 2px rgba(11, 31, 22, 0.06);
-  --rq-shadow-md: 0 6px 20px rgba(11, 31, 22, 0.08);
+  /* One sharp radius, matching the capture app's `--radius: 2px`; the pill
+     shapes (tabs, badges) keep their own literal round values. */
+  --rq-radius-sm: 2px;
+  --rq-radius-md: 2px;
+  --rq-radius-lg: 2px;
+  /* Hard-offset shadows standing in for blur — a flat displacement of the
+     rule colour rather than a soft drop shadow. */
+  --rq-shadow-sm: 2px 2px 0 var(--rq-rule);
+  --rq-shadow-md: 4px 4px 0 var(--rq-rule);
 
   /*
    * `--rq-font-sans`/`--rq-font-mono` are injected by next/font in
@@ -120,16 +135,16 @@
   color-scheme: dark;
 
   /*
-   * A soft, green-shifted charcoal rather than black. The brief was explicit:
-   * dark enough to be a dark theme, never so dark that the copy on it becomes
-   * hard to read. Body text sits at about 14:1 on the page here, and the
-   * quietest metadata still clears 4.5:1.
+   * The capture app's own dark ground, not a fresh charcoal: dark enough to
+   * be a dark theme, never so dark that the copy on it becomes hard to read.
+   * Body text sits at about 14:1 on the page here, and the quietest metadata
+   * still clears 4.5:1.
    */
-  --rq-bg: #101512;
-  --rq-surface: #1a221e;
+  --rq-bg: #121412;
+  --rq-surface: #1b1e1a;
   /* A step above the page, so a card is a card without leaning on its border. */
-  --rq-card: #19211d;
-  --rq-text: #f1efe8;
+  --rq-card: #212420;
+  --rq-text: #eeece5;
   /*
    * The muted inks are re-derived, not inherited: on paper 60%/45% of the ink
    * reads as "quieter", but the same fractions of a near-white on a dark ground
@@ -139,7 +154,8 @@
    */
   --rq-text-soft: color-mix(in srgb, var(--rq-text) 80%, transparent);
   --rq-text-faint: color-mix(in srgb, var(--rq-text) 66%, transparent);
-  --rq-divider: #2c3630;
+  --rq-divider: #353831;
+  --rq-rule: #d9d6cc;
 
   /*
    * The panels that are already dark in the light theme — the hero, the
@@ -151,23 +167,23 @@
   --rq-dark-2: #1f342a;
 
   /*
-   * The accent lifts to a mid green that holds its own on the dark ground
-   * (about 6:1 as link text), and what sits on top of it flips to the near-black
-   * page colour, because near-white on this green measures about 2.8:1.
+   * The state green lifts to hold its own on the dark ground (about 6:1 as
+   * link text). The lime signal needs no change at all — same reasoning as
+   * the capture app's `--signal` and the operator ledger's `--accent`: it
+   * never inverts, so `--rq-on-accent` doesn't either.
    */
   --rq-accent: #3fae77;
   --rq-accent-2: #4ec98d;
   --rq-accent-100: #16291f;
   --rq-accent-700: #7fd3a6;
-  --rq-on-accent: #0b130f;
 
   --rq-bad: #ef8378;
   --rq-bad-bg: #2b1614;
 
-  /* Shadows read as depth on paper and as grime on a dark ground: pulled back
-     to a plain black at low alpha, which still separates a card from the page. */
-  --rq-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --rq-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  /* The hard-offset shadow keeps its shape; only the rule colour it is drawn
+     from changes, same as every other border in the dark theme. */
+  --rq-shadow-sm: 2px 2px 0 var(--rq-rule);
+  --rq-shadow-md: 4px 4px 0 var(--rq-rule);
   }
 }
 
@@ -175,16 +191,16 @@
   color-scheme: dark;
 
   /*
-   * A soft, green-shifted charcoal rather than black. The brief was explicit:
-   * dark enough to be a dark theme, never so dark that the copy on it becomes
-   * hard to read. Body text sits at about 14:1 on the page here, and the
-   * quietest metadata still clears 4.5:1.
+   * The capture app's own dark ground, not a fresh charcoal: dark enough to
+   * be a dark theme, never so dark that the copy on it becomes hard to read.
+   * Body text sits at about 14:1 on the page here, and the quietest metadata
+   * still clears 4.5:1.
    */
-  --rq-bg: #101512;
-  --rq-surface: #1a221e;
+  --rq-bg: #121412;
+  --rq-surface: #1b1e1a;
   /* A step above the page, so a card is a card without leaning on its border. */
-  --rq-card: #19211d;
-  --rq-text: #f1efe8;
+  --rq-card: #212420;
+  --rq-text: #eeece5;
   /*
    * The muted inks are re-derived, not inherited: on paper 60%/45% of the ink
    * reads as "quieter", but the same fractions of a near-white on a dark ground
@@ -194,7 +210,8 @@
    */
   --rq-text-soft: color-mix(in srgb, var(--rq-text) 80%, transparent);
   --rq-text-faint: color-mix(in srgb, var(--rq-text) 66%, transparent);
-  --rq-divider: #2c3630;
+  --rq-divider: #353831;
+  --rq-rule: #d9d6cc;
 
   /*
    * The panels that are already dark in the light theme — the hero, the
@@ -206,23 +223,23 @@
   --rq-dark-2: #1f342a;
 
   /*
-   * The accent lifts to a mid green that holds its own on the dark ground
-   * (about 6:1 as link text), and what sits on top of it flips to the near-black
-   * page colour, because near-white on this green measures about 2.8:1.
+   * The state green lifts to hold its own on the dark ground (about 6:1 as
+   * link text). The lime signal needs no change at all — same reasoning as
+   * the capture app's `--signal` and the operator ledger's `--accent`: it
+   * never inverts, so `--rq-on-accent` doesn't either.
    */
   --rq-accent: #3fae77;
   --rq-accent-2: #4ec98d;
   --rq-accent-100: #16291f;
   --rq-accent-700: #7fd3a6;
-  --rq-on-accent: #0b130f;
 
   --rq-bad: #ef8378;
   --rq-bad-bg: #2b1614;
 
-  /* Shadows read as depth on paper and as grime on a dark ground: pulled back
-     to a plain black at low alpha, which still separates a card from the page. */
-  --rq-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --rq-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  /* The hard-offset shadow keeps its shape; only the rule colour it is drawn
+     from changes, same as every other border in the dark theme. */
+  --rq-shadow-sm: 2px 2px 0 var(--rq-rule);
+  --rq-shadow-md: 4px 4px 0 var(--rq-rule);
 }
 
 .rq-shell * {
@@ -381,7 +398,7 @@
 }
 
 .rq-card {
-  border: 1px solid var(--rq-divider);
+  border: 2px solid var(--rq-rule);
   border-radius: var(--rq-radius-lg);
   padding: 1rem 1.125rem;
   background: var(--rq-card);
@@ -440,33 +457,39 @@
   text-decoration: none;
 }
 /*
- * The primary action: flat institutional green.
+ * The primary action: the capture app's lime signal, not the institutional
+ * green.
  *
- * The two sections keep separate stylesheets on purpose, but a primary button
- * is the one component that should feel like the same object in both — a
- * requester and an operator are looking at one product.
- *
- * This replaced a three-stop gloss ramp with a lit inner edge and a specular
- * sweep on hover. It was a convincing physical button and the wrong one for a
- * product about money moving — and having it here in gloss while the operator
- * side went flat would have made two sections of one product disagree about
- * what a primary button is.
+ * The three sections keep separate stylesheets on purpose, but a primary
+ * button is the one component that should feel like the same object in all
+ * of them — a requester, an operator and a collector are looking at one
+ * product. The signal is fixed across themes and reserved for exactly this:
+ * the thing you press, never a status or a link, so it stays legible as "the
+ * one action" everywhere it appears.
  */
 .rq-btn[data-variant="primary"] {
-  background: var(--rq-accent);
+  background: var(--rq-signal);
   color: var(--rq-on-accent);
+  border: 2px solid var(--rq-rule);
+  box-shadow: var(--rq-shadow-md);
+  transition:
+    background 0.18s ease,
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .rq-btn[data-variant="primary"]:hover {
-  background: var(--rq-accent-700);
+  background: color-mix(in srgb, var(--rq-signal) 88%, black);
 }
 .rq-btn[data-variant="primary"]:active {
-  background: var(--rq-accent-700);
+  background: color-mix(in srgb, var(--rq-signal) 88%, black);
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--rq-rule);
 }
 
 .rq-btn[data-variant="secondary"] {
   background: transparent;
   color: var(--rq-text);
-  border: 1px solid var(--rq-divider);
+  border: 2px solid var(--rq-rule);
   font-weight: 700;
   min-height: 48px;
 }
@@ -485,8 +508,11 @@
   cursor: not-allowed;
 }
 
+/* Outlined, like every tag and chip in the capture app: `currentColor` picks
+   up each tone's own text colour, so the border never needs its own token. */
 .rq-pill {
   display: inline-block;
+  border: 1px solid currentColor;
   border-radius: 999px;
   padding: 4px 10px;
   font-weight: 700;
@@ -497,6 +523,7 @@
 .rq-pill[data-tone="neutral"] {
   background: color-mix(in srgb, var(--rq-text) 8%, transparent);
   color: var(--rq-text-soft);
+  border-color: var(--rq-divider);
 }
 .rq-pill[data-tone="bad"] {
   background: var(--rq-bad-bg);
@@ -532,7 +559,7 @@
 }
 
 .rq-stat {
-  border: 1px solid var(--rq-divider);
+  border: 2px solid var(--rq-rule);
   border-radius: var(--rq-radius-md);
   padding: 0.75rem;
   background: var(--rq-card);
@@ -553,8 +580,8 @@
 .rq-stepper {
   display: flex;
   align-items: center;
-  border: 1px solid var(--rq-divider);
-  border-radius: 10px;
+  border: 2px solid var(--rq-rule);
+  border-radius: var(--rq-radius-sm);
   overflow: hidden;
   flex: none;
 }
@@ -599,7 +626,7 @@
   min-height: 46px;
   margin-top: 0.375rem;
   padding: 0 0.75rem;
-  border: 1px solid var(--rq-divider);
+  border: 2px solid var(--rq-rule);
   border-radius: var(--rq-radius-sm);
   font: inherit;
   font-size: var(--text-md);
@@ -629,12 +656,16 @@
 .rq-field input:focus,
 .rq-field select:focus,
 .rq-field textarea:focus {
-  outline: 2px solid var(--rq-accent);
+  /* The capture app's weight-readout focus ring: solid signal, full weight. */
+  outline: 3px solid var(--rq-signal);
   outline-offset: 1px;
 }
 
+/* Same shape as the capture app's `.notice`: a thin outer border plus a
+   heavy tone-coloured left edge, so the colour reads as a rule, not a tint. */
 .rq-error {
-  border: 1px solid color-mix(in srgb, var(--rq-bad) 40%, transparent);
+  border: 2px solid var(--rq-rule);
+  border-left: 6px solid var(--rq-bad);
   background: var(--rq-bad-bg);
   color: var(--rq-bad);
   border-radius: var(--rq-radius-md);
@@ -643,6 +674,8 @@
   margin-bottom: 1rem;
 }
 .rq-note {
+  border: 2px solid var(--rq-rule);
+  border-left: 6px solid var(--rq-accent-700);
   background: var(--rq-accent-100);
   color: var(--rq-accent-700);
   border-radius: var(--rq-radius-md);
@@ -684,7 +717,7 @@
   width: 26px;
   height: 26px;
   flex: none;
-  border-radius: 8px;
+  border-radius: var(--rq-radius-sm);
   background: var(--rq-accent-2);
   font-size: var(--text-xs);
 }
@@ -702,7 +735,7 @@
   justify-content: center;
   text-align: center;
   padding: 0.5rem 0.25rem;
-  border-radius: 10px;
+  border-radius: var(--rq-radius-sm);
   font-weight: 600;
   font-size: var(--text-2xs);
   letter-spacing: 0.005em;
@@ -789,7 +822,7 @@
     text-align: left;
     padding: 0.65rem 0.75rem;
     margin: 0 -0.25rem;
-    border-radius: 10px;
+    border-radius: var(--rq-radius-sm);
     font-weight: 600;
     font-size: var(--text-xs);
     letter-spacing: 0;
@@ -862,7 +895,7 @@
    not a divider — so it is thicker and drawn on the row beneath instead of
    relying on that row's own (identical, so invisible as an emphasis) hairline. */
 .rq-table thead tr {
-  border-bottom: 1px solid var(--rq-divider);
+  border-bottom: 2px solid var(--rq-rule);
 }
 .rq-table tbody tr:first-child td {
   border-top: 0;
@@ -1028,6 +1061,22 @@
 .rq-shell .rq-btn:active:not(:disabled) {
   transform: translateY(1px) scale(0.985);
   box-shadow: var(--rq-shadow-sm);
+  transition-duration: 0.06s;
+}
+
+/*
+ * The primary button overrides the generic lift-and-float above: the signal
+ * button is a hard-edged object that sits on its own shadow and presses flat
+ * into the page, the same physical model as the capture app's action button,
+ * not a card that floats free of it.
+ */
+.rq-shell .rq-btn[data-variant="primary"]:hover:not(:disabled) {
+  transform: none;
+  box-shadow: var(--rq-shadow-md);
+}
+.rq-shell .rq-btn[data-variant="primary"]:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--rq-rule);
   transition-duration: 0.06s;
 }
 
@@ -1294,12 +1343,16 @@
   color: rgba(250, 249, 244, 0.82);
   max-width: 46ch;
 }
+/* The claim card sits on a dark ground, but the button on it is still the
+   same signal every other primary action in the product uses — the lime
+   never adapts to its background, only the black rule around it does. */
 .rq-claim .rq-btn[data-variant="primary"] {
-  background: var(--rq-accent-2);
-  color: var(--rq-dark);
+  background: var(--rq-signal);
+  color: var(--rq-on-accent);
+  border-color: #111311;
 }
 .rq-claim .rq-btn[data-variant="primary"]:hover {
-  background: #4cc98b;
+  background: color-mix(in srgb, var(--rq-signal) 88%, black);
 }
 
 /* On a wide screen the controls keep a phone-like width rather than
@@ -1407,7 +1460,7 @@
   position: absolute;
   inset: 18%;
   border: 3px solid rgba(250, 249, 244, 0.9);
-  border-radius: 12px;
+  border-radius: var(--rq-radius-sm);
   box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }

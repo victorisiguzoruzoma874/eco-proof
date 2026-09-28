@@ -1,12 +1,15 @@
 /*
  * ProofChain Ledger — the operator/auditor design system.
  *
- * The audience is an operator reconciling weights and an auditor deciding
- * whether to believe us, so the register is institutional financial software:
- * warm paper ground, borders instead of shadows, tabular figures on every
- * amount, and colour reserved strictly for state. Poppins carries the whole
- * product — wordmark, titles and body alike — so hierarchy is built from
- * weight and space rather than from a second voice.
+ * Re-skinned onto the capture app's field-instrument language: the same
+ * bone ground, near-black ink, one saturated lime signal reserved for the
+ * thing you press, and heavy rules/hard-offset shadows standing in for the
+ * old hairline-and-blur treatment. An operator reconciling weights and an
+ * auditor deciding whether to believe the numbers are reading the same
+ * instrument a collector weighs material on, not a separate "admin panel"
+ * voice — the ledger is the same product, one screen further from the scale.
+ * Poppins still carries the whole product — wordmark, titles and body alike —
+ * so hierarchy is built from weight and space rather than from a second face.
  *
  * Every token this section uses is declared in this block. Component rules
  * below may not invent a colour, a size, or a spacing value.
@@ -14,49 +17,60 @@
 
 :root {
   /* ---- surfaces and ink ------------------------------------------------ */
-  --paper: #f7f5ef;
+  --paper: #f4f2ec;
   /* A second ground, half a step down, for rows and wells that need to sit
      behind the card surface without becoming a different material. */
-  --paper-sunk: #f5f3ed;
-  --surface: #fcfbf7;
-  --ink: #171714;
-  --ink-soft: #6f6b63;
-  --ink-faint: #8b877f;
-  --rule: #d9d5cc;
-  /* The heavy rule is now reserved for table head underlines and print. The
-     2px black divider it used to draw under every page title is gone — see
-     `.page-head`. */
-  --rule-strong: #b9b3a7;
+  --paper-sunk: #e6e4dd;
+  --surface: #ffffff;
+  --ink: #111311;
+  --ink-soft: #4a4d47;
+  --ink-faint: color-mix(in srgb, var(--ink-soft) 68%, var(--paper));
+  /* The loud rule: near-black, full strength, drawn wherever an edge is a
+     boundary rather than a divider — card borders, table wraps, the topbar
+     and page-head lines, button outlines. */
+  --rule: #111311;
+  /* Kept as a token so existing hover states still resolve, but no longer a
+     lighter grey standing in for emphasis: at full ink there is nothing
+     stronger than `--rule` to escalate to, so this now equals it. */
+  --rule-strong: #111311;
+  /* The quiet rule: a hairline between rows inside an already-bordered card,
+     where a second black line would compete with the boundary around it. */
+  --rule-soft: #d8d5cc;
 
   /* ---- state ------------------------------------------------------------
-   * Three tones, and each one means exactly one thing:
+   * Four tones now, not three, because selection and status stopped sharing
+   * a colour:
    *   verified  settled, reconciled, paid
    *   pending   someone still has to act
    *   broken    rejected, failed, unreachable
-   * `--accent` is the same green as `verified` on purpose: the institutional
-   * green marks both "this is done" and "this is the action that does it".
+   *   accent    the one thing on the page you are meant to press
+   * The old palette made `--accent` the same green as `verified`, so "this is
+   * done" and "this is the action that does it" were one hue. The capture
+   * app keeps them apart — a lime signal for the control, a green for the
+   * state — so a primary button and a settled badge never compete for the
+   * same read.
    */
-  --verified: #315c45;
-  --verified-bg: #e8f0ea;
-  --pending: #8a6410;
-  --pending-bg: #f5eddb;
-  --broken: #a6532a;
-  --broken-bg: #f1e5da;
+  --verified: #0d7a3d;
+  --verified-bg: #e3f3e8;
+  --pending: #b8631a;
+  --pending-bg: #f7e9da;
+  --broken: #b3261e;
+  --broken-bg: #f7e1de;
 
-  --accent: #315c45;
-  --accent-bg: #e8f0ea;
-  --accent-deep: #234533;
-  /*
-   * Text on a filled green button. It is a token rather than a literal because
-   * it has to invert with the theme: the dark palette lifts `--accent` to a
-   * mid-sage so it can hold its own against a near-black ground, and near-white
-   * text on that measures about 2.3:1. The dark ground reads about 7:1 on it.
-   */
-  --on-accent: #fcfbf7;
+  /* Recovered-material lime — the product's one saturated accent, fixed
+     across both themes exactly as it is in the capture app: the signal never
+     needs to invert, so its label doesn't either. */
+  --accent: #c8f000;
+  --accent-bg: #eef8c4;
+  --accent-deep: #a8cc00;
+  /* Text on the lime signal. Pinned dark in both themes, same reasoning as
+     capture's `--on-signal`: the accent does not darken for the dark palette,
+     so the ink sitting on it must not lighten to meet it halfway. */
+  --on-accent: #111311;
 
   --category-airtime: #2b6e8f;
-  --category-discount: #8a6410;
-  --category-goods: #315c45;
+  --category-discount: #b8631a;
+  --category-goods: #0d7a3d;
 
   /* ---- type -------------------------------------------------------------
    * `--font-sans`/`--font-mono` are injected by next/font in
@@ -114,9 +128,16 @@
   --space-12: 3rem; /*   48 */
   --space-16: 4rem; /*   64 */
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  /*
+   * One sharp radius everywhere a card, input or button used to round its
+   * corners — matching the capture app's single `--radius: 2px`. Only the
+   * pill stays round: a status badge and a filter segment are labels, not
+   * panels, and a rounded label is legible in the same instant a rounded
+   * card reads as decoration.
+   */
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
   --radius-pill: 9999px;
 
   /*
@@ -127,44 +148,51 @@
   --measure: 1160px;
   --gutter: clamp(1.25rem, 0.55rem + 2.2vw, 3rem);
 
-  /* One duration and one curve for the whole section. */
-  --duration: 160ms;
-  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  /* One duration and one curve for the whole section, matched to the
+     capture app's snap rather than the old institutional ease-out. */
+  --duration: 140ms;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* The hard-offset shadow standing in for blur: a flat displacement of the
+     rule colour, the same device the capture app uses for its primary
+     button and its "load-bearing" cards (a floating popover, a proof
+     banner). Two sizes — most objects; the shell-scale one is for panels
+     that sit further off the page. */
+  --shadow-hard: 4px 4px 0 var(--rule);
+  --shadow-hard-lg: 6px 6px 0 var(--rule);
 }
 
 /*
- * The dark values, named once.
+ * The dark values, named once — the capture app's dark palette, not a fresh
+ * inversion: same field-instrument logic, same instinct that this is "the
+ * same instrument at night" rather than a second design.
  *
  * Two selectors can apply them — the system preference, and an explicit choice
  * from the theme toggle — and a palette written out twice is a palette that
  * drifts. Only the mapping is repeated below; the colours live here alone.
  *
- * This is a dark institutional palette, not an inversion: the ground is a
- * green-shifted charcoal rather than neutral grey, the state tints stay dark
- * and desaturated so a badge never glows, and the greens lift enough to hold
- * 4.5:1 on that ground.
+ * The rule stays near-full strength (it is what the hard borders and offset
+ * shadows are made of), the state tints lift until they hold 4.5:1 on the
+ * dark ground, and the lime signal needs no change at all.
  */
 :root {
-  --dark-paper: #101411;
-  --dark-paper-sunk: #0c0f0d;
-  --dark-surface: #151a17;
-  --dark-ink: #f2f0e8;
-  --dark-ink-soft: #a9aaa1;
-  --dark-ink-faint: #85867e;
-  --dark-rule: #2b322d;
-  --dark-rule-strong: #3d453f;
+  --dark-paper: #121412;
+  --dark-paper-sunk: #1b1e1a;
+  --dark-surface: #1b1e1a;
+  --dark-ink: #eeece5;
+  --dark-ink-soft: #a9ada3;
+  --dark-rule: #d9d6cc;
+  --dark-rule-strong: #d9d6cc;
+  --dark-rule-soft: #353831;
 
-  --dark-verified: #6d9c7d;
-  --dark-verified-bg: #16241b;
-  --dark-pending: #cc9b4a;
-  --dark-pending-bg: #241d10;
-  --dark-broken: #d98a63;
-  --dark-broken-bg: #2a1a12;
+  --dark-verified: #3dbb6e;
+  --dark-verified-bg: #16281e;
+  --dark-pending: #e8913f;
+  --dark-pending-bg: #2b1f10;
+  --dark-broken: #f0675c;
+  --dark-broken-bg: #2c1815;
 
-  --dark-accent: #6d9c7d;
-  --dark-accent-bg: #16241b;
-  --dark-accent-deep: #86b294;
-  --dark-on-accent: #101411;
+  --dark-accent-bg: #2a3006;
 }
 
 /*
@@ -185,9 +213,9 @@
     --surface: var(--dark-surface);
     --ink: var(--dark-ink);
     --ink-soft: var(--dark-ink-soft);
-    --ink-faint: var(--dark-ink-faint);
     --rule: var(--dark-rule);
     --rule-strong: var(--dark-rule-strong);
+    --rule-soft: var(--dark-rule-soft);
 
     --verified: var(--dark-verified);
     --verified-bg: var(--dark-verified-bg);
@@ -195,12 +223,11 @@
     --pending-bg: var(--dark-pending-bg);
     --broken: var(--dark-broken);
     --broken-bg: var(--dark-broken-bg);
-    --accent: var(--dark-accent);
+    /* --accent and --on-accent are deliberately absent: the lime signal is
+       fixed across both themes, same as the capture app's --signal. */
 
     --paper-sunk: var(--dark-paper-sunk);
     --accent-bg: var(--dark-accent-bg);
-    --accent-deep: var(--dark-accent-deep);
-    --on-accent: var(--dark-on-accent);
   }
 }
 
@@ -211,9 +238,9 @@
   --surface: var(--dark-surface);
   --ink: var(--dark-ink);
   --ink-soft: var(--dark-ink-soft);
-  --ink-faint: var(--dark-ink-faint);
   --rule: var(--dark-rule);
   --rule-strong: var(--dark-rule-strong);
+  --rule-soft: var(--dark-rule-soft);
 
   --verified: var(--dark-verified);
   --verified-bg: var(--dark-verified-bg);
@@ -221,12 +248,9 @@
   --pending-bg: var(--dark-pending-bg);
   --broken: var(--dark-broken);
   --broken-bg: var(--dark-broken-bg);
-  --accent: var(--dark-accent);
 
   --paper-sunk: var(--dark-paper-sunk);
   --accent-bg: var(--dark-accent-bg);
-  --accent-deep: var(--dark-accent-deep);
-  --on-accent: var(--dark-on-accent);
 }
 
 :root[data-theme="light"] {
@@ -306,7 +330,9 @@ summary:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--accent);
+  /* The capture app's own focus ring weight: a 3px lime outline is loud
+     enough to find at arm's length, which is no less true at a desk. */
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -338,7 +364,9 @@ select:focus-visible {
 }
 
 .topbar {
-  border-bottom: 1px solid var(--rule);
+  /* The masthead boundary, same weight as the capture app's: 3px, near-black,
+     the one line on the page that says "everything above this is chrome". */
+  border-bottom: 3px solid var(--rule);
   margin-bottom: var(--space-10);
   position: sticky;
   top: 0;
@@ -384,7 +412,9 @@ select:focus-visible {
 }
 
 .brand em {
-  font-style: italic;
+  /* Upright, not italic — matching the capture app's wordmark, which never
+     reaches for a swash alternate to mark the qualifier as secondary. */
+  font-style: normal;
   font-size: var(--text-base);
   color: var(--ink-soft);
 }
@@ -424,16 +454,18 @@ nav.links {
 }
 
 /*
- * "You are here": the institutional green on its own tint, inside a border a
- * shade deeper. A tinted chip rather than the underline-and-bloom this used to
- * carry — at a glance it reads as a selected item in a financial tool rather
- * than as a link that happens to be lit.
+ * "You are here": an inked chip, not a tinted one — the same move the capture
+ * app's material chips make when pressed (`.chip[aria-pressed="true"]`:
+ * filled ink, inverted text). Selection and status used to share the
+ * institutional green, so a "you are here" link and a "verified" badge read
+ * as the same colour; inverting the chip instead keeps the lime signal and
+ * the state greens free to mean only what they mean elsewhere on the page.
  */
 .nav-link[data-active="true"] {
-  color: var(--accent);
+  color: var(--paper);
   font-weight: 600;
-  background: var(--accent-bg);
-  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: var(--ink);
+  border-color: var(--ink);
 }
 
 .nav-more {
@@ -462,11 +494,11 @@ nav.links {
   flex-direction: column;
   padding: var(--space-1);
   background: var(--surface);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
   /* The one shadow in the section, and it is here because this panel floats
      over the page: a hairline alone cannot say "in front of". */
-  box-shadow: 0 10px 24px rgba(23, 23, 20, 0.12);
+  box-shadow: var(--shadow-hard-lg);
 }
 
 .nav-more-item {
@@ -488,9 +520,9 @@ nav.links {
 }
 
 .nav-more-item[data-active="true"] {
-  color: var(--accent);
+  color: var(--paper);
   font-weight: 600;
-  background: var(--accent-bg);
+  background: var(--ink);
 }
 
 /*
@@ -528,7 +560,7 @@ nav.links {
   font-weight: 500;
   color: var(--ink-soft);
   text-decoration: none;
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-pill);
   padding: var(--space-2) var(--space-3);
   line-height: 1.2;
@@ -623,12 +655,12 @@ button.signin-link {
     z-index: 30;
     gap: var(--space-1);
     padding: var(--space-3) var(--gutter) var(--space-4);
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
+    border-top: 2px solid var(--rule);
+    border-bottom: 2px solid var(--rule);
     background: var(--paper);
     max-height: min(70vh, 32rem);
     overflow-y: auto;
-    box-shadow: 0 10px 24px rgba(23, 23, 20, 0.12);
+    box-shadow: var(--shadow-hard-lg);
   }
 
   .nav-panel .nav-link,
@@ -666,9 +698,10 @@ button.signin-link {
  * uses to confirm they are in the right place before reading anything else —
  * tracked capitals are legitimate at that job and at that length.
  *
- * The 2px black slab that used to sit under every title is gone: at full ink it
- * read as a redaction bar rather than a rule, and it was the loudest thing on a
- * page whose whole argument is restraint.
+ * A heavy black rule sits under every title again — restored on purpose. In
+ * the old restrained register it read as a redaction bar; in the field-
+ * instrument register it borrows next to it, a loud boundary under a page
+ * title is just the masthead rule repeated, not a foreign gesture.
  */
 .page-head {
   display: flex;
@@ -678,7 +711,7 @@ button.signin-link {
   flex-wrap: wrap;
   margin-bottom: var(--space-8);
   padding-bottom: var(--space-6);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 3px solid var(--rule);
 }
 
 .page-head-text {
@@ -812,7 +845,7 @@ h3 {
   padding: var(--space-2);
   gap: var(--space-1);
   background: var(--paper-sunk);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
   flex-wrap: wrap;
 }
@@ -848,10 +881,12 @@ h3 {
   color: var(--ink);
 }
 
+/* The pressed segment, same treatment as a selected material chip in the
+   capture app: filled ink, inverted text, rather than a tinted surface. */
 .segmented a[aria-current="true"] {
-  background: var(--surface);
-  border-color: var(--rule);
-  color: var(--ink);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
   font-weight: 600;
 }
 
@@ -881,7 +916,7 @@ h3 {
 
 .metric {
   background: var(--surface);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   min-width: 0;
@@ -931,7 +966,7 @@ h3 {
 
 .table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
@@ -959,14 +994,18 @@ th {
   color: var(--ink-faint);
   background: var(--paper-sunk);
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--rule);
+  /* The one border in the table that is a boundary, not a divider — full
+     weight, matching the topbar and page-head rules. */
+  border-bottom: 2px solid var(--rule);
   white-space: nowrap;
   vertical-align: middle;
 }
 
 td {
   padding: var(--space-4);
-  border-bottom: 1px solid var(--rule);
+  /* Row dividers stay the quiet rule: a black line under every row would
+     turn a ledger into a grid. */
+  border-bottom: 1px solid var(--rule-soft);
   vertical-align: middle;
   text-align: left;
   line-height: 1.45;
@@ -1136,7 +1175,9 @@ tbody tr:hover {
 /*
  * Status is never carried by colour alone — the word is always present, and the
  * tint only ranks it. Grounds are the palette's own state tints, so a badge
- * never glows against the paper.
+ * never glows against the paper. The outline is new: `border: 1px solid
+ * currentColor` picks up each tone's own text colour, the same outlined-tag
+ * habit the capture app uses for every chip and product tag it draws.
  */
 .pill {
   display: inline-block;
@@ -1145,6 +1186,7 @@ tbody tr:hover {
   font-weight: 600;
   letter-spacing: 0.01em;
   padding: var(--space-1) var(--space-3);
+  border: 1px solid currentColor;
   border-radius: var(--radius-pill);
   white-space: nowrap;
   text-transform: capitalize;
@@ -1165,6 +1207,7 @@ tbody tr:hover {
 .pill[data-tone="neutral"] {
   background: var(--paper-sunk);
   color: var(--ink-soft);
+  border-color: var(--rule-soft);
 }
 
 /* ---------- stat row (batch/report pages) ---------- */
@@ -1178,7 +1221,7 @@ tbody tr:hover {
 
 .stat {
   background: var(--surface);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   min-width: 0;
@@ -1215,13 +1258,17 @@ tbody tr:hover {
 /* ---------- proof banner ---------- */
 
 .proof {
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--ink-faint);
+  border: 2px solid var(--rule);
+  border-left: 6px solid var(--ink-faint);
   border-radius: var(--radius-md);
   background: var(--surface);
   padding: var(--space-6);
   display: grid;
   gap: var(--space-2);
+  /* Load-bearing, same as the capture app's own `.proof`: an operator or
+     auditor may act on what this banner says, so it gets the hard-offset
+     treatment rather than sitting flush with the page like a plain card. */
+  box-shadow: var(--shadow-hard);
 }
 
 .proof[data-state="verified"] {
@@ -1272,7 +1319,7 @@ tbody tr:hover {
 .qr-code {
   display: block;
   margin: 0 auto;
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-md);
   background: #fff;
   padding: var(--space-2);
@@ -1281,12 +1328,13 @@ tbody tr:hover {
 /* ---------- lookup code (printable weigh-in proof) ---------- */
 
 .lookup-code-box {
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--accent);
+  border: 2px solid var(--rule);
+  border-left: 6px solid var(--accent);
   border-radius: var(--radius-md);
   background: var(--surface);
   padding: var(--space-6);
   text-align: center;
+  box-shadow: var(--shadow-hard);
 }
 
 /* A code read off a printed slip and typed back in — mono, tracked, so 0 and O
@@ -1309,7 +1357,7 @@ tbody tr:hover {
   gap: var(--space-2);
   min-height: 40px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   background: var(--surface);
   color: var(--ink);
   font-family: var(--sans);
@@ -1331,22 +1379,43 @@ tbody tr:hover {
 }
 
 /*
- * The primary action: flat institutional green.
- *
- * This replaces a three-stop gloss ramp with an inset lit edge and a specular
- * sweep on hover. That button was a convincing physical object and entirely
- * wrong for the room — in a tool whose subject is money moving, the control
- * that moves it should read as deliberate, not as inviting.
+ * The primary action: the capture app's own signal button, moved to a desktop
+ * pointer. Lime fill, black border and a hard-offset shadow that the button
+ * physically "sits on" — pressed in on click, exactly the way the collector's
+ * "Sign & queue weigh-in" button behaves. The control that moves money should
+ * read as deliberate, and a button you can watch physically depress is a more
+ * literal deliberateness than a flat institutional green ever argued for.
  */
 .btn[data-variant="primary"] {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: var(--rule);
   color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-hard);
+  transition:
+    background-color var(--duration) var(--ease),
+    transform 120ms var(--ease),
+    box-shadow 120ms var(--ease);
 }
 
 .btn[data-variant="primary"]:hover:not(:disabled) {
   background: var(--accent-deep);
-  border-color: var(--accent-deep);
+  border-color: var(--rule);
+}
+
+.btn[data-variant="primary"]:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 var(--rule);
+}
+
+.btn[data-variant="primary"]:disabled {
+  background: var(--paper-sunk);
+  color: var(--ink-soft);
+  border-color: var(--rule-soft);
+  box-shadow: none;
+  /* Flat and readable rather than faded: matches the capture app's own
+     disabled action button, which goes dull rather than translucent. */
+  opacity: 1;
 }
 
 /* A destructive confirmation reads in the broken tone, so "Confirm reject" is
@@ -1395,9 +1464,9 @@ tbody tr:hover {
   margin-top: var(--space-2);
   padding: var(--space-4);
   background: var(--surface);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
-  box-shadow: 0 10px 24px rgba(23, 23, 20, 0.12);
+  box-shadow: var(--shadow-hard-lg);
   display: grid;
   gap: var(--space-3);
   text-align: left;
@@ -1425,7 +1494,7 @@ tbody tr:hover {
   margin: var(--space-4) 0 var(--space-8);
   padding: var(--space-6);
   background: var(--surface);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
   display: grid;
   gap: var(--space-4);
@@ -1446,7 +1515,7 @@ textarea {
   min-height: 42px;
   width: 100%;
   padding: 0 var(--space-3);
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   background: var(--surface);
   color: var(--ink);
   font-family: var(--sans);
@@ -1464,7 +1533,9 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   border-color: var(--accent);
-  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  /* Solid, full-strength lime — matching the capture app's own weight input,
+     not a softened tint of it. */
+  outline: 3px solid var(--accent);
   outline-offset: 0;
 }
 
@@ -1487,7 +1558,7 @@ label {
  */
 .alert {
   border: 1px solid transparent;
-  border-left: 3px solid var(--ink-faint);
+  border-left: 6px solid var(--ink-faint);
   border-radius: var(--radius-md);
   background: var(--paper-sunk);
   padding: var(--space-4) var(--space-6);
@@ -1573,7 +1644,7 @@ label {
 
 /* Kept for the inline `?error=` messages that have no title to carry. */
 .error {
-  border-left: 3px solid var(--broken);
+  border-left: 6px solid var(--broken);
   border-radius: var(--radius-md);
   background: var(--broken-bg);
   color: var(--broken);
@@ -1599,7 +1670,7 @@ label {
 .empty {
   padding: var(--space-16) var(--space-6);
   text-align: center;
-  border: 1px solid var(--rule);
+  border: 2px solid var(--rule);
   border-radius: var(--radius-lg);
   background: var(--surface);
   display: grid;
