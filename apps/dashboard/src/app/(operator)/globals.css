@@ -27,7 +27,7 @@
   --ink-faint: color-mix(in srgb, var(--ink-soft) 68%, var(--paper));
   /* The loud rule: near-black, full strength, drawn wherever an edge is a
      boundary rather than a divider — card borders, table wraps, the topbar
-     and page-head lines, button outlines. */
+     rule, button outlines. */
   --rule: #111311;
   /* Kept as a token so existing hover states still resolve, but no longer a
      lighter grey standing in for emphasis: at full ink there is nothing
@@ -698,10 +698,9 @@ button.signin-link {
  * uses to confirm they are in the right place before reading anything else —
  * tracked capitals are legitimate at that job and at that length.
  *
- * A heavy black rule sits under every title again — restored on purpose. In
- * the old restrained register it read as a redaction bar; in the field-
- * instrument register it borrows next to it, a loud boundary under a page
- * title is just the masthead rule repeated, not a foreign gesture.
+ * No rule under the title: tried at full masthead weight and it competed with
+ * every table boundary on the page below it — one loud line reads as "the
+ * edge of the header", six of them on a page reads as a grid.
  */
 .page-head {
   display: flex;
@@ -710,8 +709,6 @@ button.signin-link {
   gap: var(--space-6);
   flex-wrap: wrap;
   margin-bottom: var(--space-8);
-  padding-bottom: var(--space-6);
-  border-bottom: 3px solid var(--rule);
 }
 
 .page-head-text {
@@ -995,7 +992,7 @@ th {
   background: var(--paper-sunk);
   padding: var(--space-3) var(--space-4);
   /* The one border in the table that is a boundary, not a divider — full
-     weight, matching the topbar and page-head rules. */
+     weight, matching the topbar rule. */
   border-bottom: 2px solid var(--rule);
   white-space: nowrap;
   vertical-align: middle;
