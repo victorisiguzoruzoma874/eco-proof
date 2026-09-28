@@ -363,6 +363,83 @@ select:focus-visible {
   pointer-events: none;
 }
 
+/*
+ * The sign-in mascot: a trash-can character peeking above the card. Built
+ * from a single artwork (can + lid + character in one image, already popped
+ * partway out) via a "periscope" reveal rather than a state-swapped sprite:
+ * `.login-mascot-window` is a fixed-width, overflow-hidden box shorter than
+ * the image, and the image is pinned to its bottom edge, so growing the
+ * window's height is what reveals more of the character from the can
+ * upward. One asset, three window heights, no JS.
+ *
+ *   idle   (--login-mascot-idle)   just the can — the character is scrolled
+ *                                  out of view above the window
+ *   peek   (--login-mascot-peek)   eyes and the top of the head clear the rim
+ *   full   (--login-mascot-full)   the whole image, lid included
+ *
+ * Sized to sit "directly on top" of the card and read as a companion to it,
+ * not a hero illustration: about a fifth of the card's own width.
+ */
+.login-mascot {
+  --login-mascot-w: 120px;
+  --login-mascot-full: 213px;
+  --login-mascot-peek: 145px;
+  --login-mascot-idle: 81px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.login-mascot-window {
+  position: relative;
+  width: var(--login-mascot-w);
+  height: var(--login-mascot-idle);
+  overflow: hidden;
+  transition: height 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.login-mascot-window img {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: block;
+  width: var(--login-mascot-w);
+  height: var(--login-mascot-full);
+  max-width: none;
+}
+
+/* Hover anywhere on the card or the mascot itself: a quick look up over the
+   rim and back down, one shot per hover-in rather than a repeating loop. */
+@keyframes login-mascot-peek {
+  0%,
+  100% {
+    height: var(--login-mascot-idle);
+  }
+  45% {
+    height: var(--login-mascot-peek);
+  }
+}
+
+.login-hover-scope:hover:not(:has(.login-fields:focus-within)) .login-mascot-window {
+  animation: login-mascot-peek 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Typing in either field (not the button) brings it all the way out and
+   holds it there; moving focus off the fields — including by clicking
+   "Sign in" — lets the transition above ease it back down into the can. */
+.login-hover-scope:has(.login-fields:focus-within) .login-mascot-window {
+  height: var(--login-mascot-full);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-mascot-window {
+    transition: none;
+  }
+  .login-hover-scope:hover .login-mascot-window {
+    animation: none;
+  }
+}
+
 .topbar {
   /* The masthead boundary, same weight as the capture app's: 3px, near-black,
      the one line on the page that says "everything above this is chrome". */

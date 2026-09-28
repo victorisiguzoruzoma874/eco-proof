@@ -60,34 +60,51 @@ export default async function LoginPage({
       ) : null}
 
       {/*
-        The form is a contained card rather than a bare full-width column: on a
-        78rem shell an unbounded sign-in form reads as an unfinished page. The
-        border/ground pair is the same hairline-on-surface vocabulary the tables
-        and popovers use, so this stays inside the system rather than inventing
-        a card style for one screen.
+        The mascot and the card share one hover/focus scope: hovering anywhere
+        over either makes it peek, and typing in the fields (not the button)
+        brings it fully out — see `.login-mascot*` in globals.css. Purely CSS
+        (:hover, :has(:focus-within)), so the sign-in form stays a server
+        action with no client component needed for it.
       */}
-      <section
-        style={{
-          border: "1px solid var(--rule)",
-          background: "var(--surface)",
-          borderRadius: "2px",
-          padding: "1.75rem",
-        }}
-      >
-        <form action={signIn} style={{ display: "grid", gap: "1rem" }}>
-          <label>
-            Email
-            <input name="email" type="email" required autoComplete="username" />
-          </label>
-          <label>
-            Password
-            <input name="password" type="password" required autoComplete="current-password" />
-          </label>
-          <button className="btn" data-variant="primary" type="submit">
-            Sign in
-          </button>
-        </form>
-      </section>
+      <div className="login-hover-scope">
+        <div className="login-mascot" aria-hidden="true">
+          <div className="login-mascot-window">
+            <img src="/illustrations/login-mascot.gif" alt="" />
+          </div>
+        </div>
+
+        {/*
+          The form is a contained card rather than a bare full-width column: on a
+          78rem shell an unbounded sign-in form reads as an unfinished page. The
+          border/ground pair is the same hairline-on-surface vocabulary the tables
+          and popovers use, so this stays inside the system rather than inventing
+          a card style for one screen.
+        */}
+        <section
+          style={{
+            border: "1px solid var(--rule)",
+            background: "var(--surface)",
+            borderRadius: "2px",
+            padding: "1.75rem",
+          }}
+        >
+          <form action={signIn} style={{ display: "grid", gap: "1rem" }}>
+            <div className="login-fields" style={{ display: "grid", gap: "1rem" }}>
+              <label>
+                Email
+                <input name="email" type="email" required autoComplete="username" />
+              </label>
+              <label>
+                Password
+                <input name="password" type="password" required autoComplete="current-password" />
+              </label>
+            </div>
+            <button className="btn" data-variant="primary" type="submit">
+              Sign in
+            </button>
+          </form>
+        </section>
+      </div>
 
       <p className="note" style={{ marginTop: "1.5rem" }}>
         Auditors get read-only access. Verification endpoints and audit reports stay public by
