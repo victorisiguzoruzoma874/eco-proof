@@ -289,6 +289,13 @@ main {
   gap: 0.5rem;
 }
 
+/* `.field`'s own `display: grid` outranks the browser's built-in `[hidden]`
+   rule at equal specificity (author beats user-agent), so a hidden field was
+   rendering anyway — this is what the backend-URL field actually needed. */
+.field[hidden] {
+  display: none;
+}
+
 .label {
   font-family: var(--font);
   font-size: var(--label);
