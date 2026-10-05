@@ -22,8 +22,19 @@ export interface IngestResponse {
   };
 }
 
+/*
+ * The production default, baked in at build time so a freshly provisioned
+ * phone never needs an operator to type a server address — the field that
+ * used to carry it is now hidden by default (see `provisionScreen` in
+ * `main.ts`). A local `npm run dev` build keeps pointing at the dev API, same
+ * as before.
+ */
+const DEFAULT_BACKEND_URL = import.meta.env.PROD
+  ? "https://proofchain-api-production.up.railway.app"
+  : "http://localhost:3000";
+
 export function backendUrl(): string {
-  return localStorage.getItem("proofchain.backendUrl") ?? "http://localhost:3000";
+  return localStorage.getItem("proofchain.backendUrl") ?? DEFAULT_BACKEND_URL;
 }
 
 export function setBackendUrl(url: string): void {

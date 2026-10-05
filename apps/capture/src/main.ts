@@ -483,6 +483,7 @@ async function render(): Promise<void> {
     syncThemeToggle();
   });
   syncThemeToggle();
+  wireBackendReveal();
 
   if (carriedWeight) {
     const next = document.getElementById("weight") as HTMLInputElement | null;
@@ -496,11 +497,42 @@ async function render(): Promise<void> {
   }
 }
 
+/*
+ * The backend-URL field's escape hatch: five taps on the wordmark within 1.5s
+ * unhides it. Module-level, not per-element, because `render()` tears down
+ * and rebuilds the whole subtree on every screen switch — a counter living on
+ * the DOM node would reset itself away before a slow tapper reached five.
+ * Silently a no-op on the capture screen, where there is no `#backend-field`
+ * to reveal.
+ */
+let backendRevealTaps = 0;
+let backendRevealTimer: number | undefined;
+
+function wireBackendReveal(): void {
+  const wordmark = document.getElementById("wordmark");
+  const field = document.getElementById("backend-field");
+  if (!wordmark || !field) return;
+
+  wordmark.addEventListener("click", () => {
+    backendRevealTaps += 1;
+    window.clearTimeout(backendRevealTimer);
+    backendRevealTimer = window.setTimeout(() => {
+      backendRevealTaps = 0;
+    }, 1500);
+
+    if (backendRevealTaps >= 5) {
+      backendRevealTaps = 0;
+      field.hidden = false;
+      document.getElementById("backend")?.focus();
+    }
+  });
+}
+
 function masthead(): string {
   const online = navigator.onLine;
   return `
     <header class="masthead">
-      <h1 class="wordmark">ProofChain <span>capture</span></h1>
+      <h1 class="wordmark" id="wordmark">ProofChain <span>capture</span></h1>
       <span class="masthead-end">
         <span class="net" data-online="${online}">${online ? "online" : "offline"}</span>
         <button class="theme-toggle" type="button" id="theme-toggle" aria-label="${themeToggleLabel(currentTheme())}">${themeToggleIcon(currentTheme())}</button>
@@ -718,7 +750,16 @@ function provisionScreen(): string {
         <code class="meta" id="pubkey" style="user-select:all">${escapeHtml(identity.publicKeyBase64)}</code>
       </div>
 
-      <div class="field">
+      <!--
+        Hidden by default: a raw server address in front of a collector reads
+        as unfinished product, not as a setting they need. The production
+        build already defaults this field's value correctly (see
+        DEFAULT_BACKEND_URL in lib/api.ts), so hiding it costs nothing for
+        the normal pairing flow. It still exists in the DOM — "Sign in" below
+        reads it unconditionally — and five taps on the wordmark reveals it
+        for the rare case a phone needs pointing at a different backend.
+      -->
+      <div class="field" id="backend-field" hidden>
         <label class="label" for="backend">Backend URL</label>
         <input id="backend" type="text" value="${escapeHtml(backendUrl())}" inputmode="url" />
       </div>
