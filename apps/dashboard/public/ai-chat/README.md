@@ -120,4 +120,4 @@ npm run build -w @proofchain/backend
 npm run build -w @proofchain/dashboard
 ```
 
-No live provider connectivity or deployment activation is claimed. Configure the server key and test an actual requester session, live tools, review prefilling and explicit form submission in staging before activation.
+Railway activation and live provider/session/task checks subsequently passed on 2026-10-06; see `VERIFICATION.md`. The deployed backend is `https://proofchain-api-production.up.railway.app`. Live verification used a temporary requester and removed it afterward. Withdrawal prefilling/final submission and original independent artwork retain the documented limitations. Railway setup is described in `docs/railway-assistant.md` at the repository root.

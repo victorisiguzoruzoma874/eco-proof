@@ -1,5 +1,29 @@
 # Verification — 2026-10-06
 
+## Railway activation — subsequent live checks
+
+The `proofchain-api` production service was deployed successfully to
+`https://proofchain-api-production.up.railway.app` (deployment
+`8a5e87ab-0230-438d-9c9e-283f1f1808f6`). Existing database and JWT settings were
+preserved. DeepSeek credentials were configured as server-side Railway variables.
+
+- A real DeepSeek `deepseek-flash` completion returned HTTP 200.
+- Railway `/health` reported `status: ok` and `database: up`.
+- Unauthenticated assistant requests returned 401.
+- `node e2e/assistant-live.mjs` passed: a temporary zero-balance requester received
+  a live tool-backed balance answer; the deployed Vercel widget used its httpOnly
+  session bridge to receive a live streamed reply and offer a wallet button.
+- The wallet did not open until the button was clicked. The host callback then
+  confirmed the wallet screen opened.
+- The temporary requester and its empty wallet were deleted afterward. No
+  payment or withdrawal was submitted, and existing accounts were not changed.
+
+These checks supersede the earlier pre-activation live-provider limitations
+below. Withdrawal review/submission and original layered artwork remain subject
+to the earlier limitations. The live check uses a temporary account, not the
+user's own financial records. The backend is now active; its deployment and the
+provider were both checked rather than inferred from compilation.
+
 ## Executed automated checks
 
 - `node e2e/robot-widget.mjs`: PASS in Chromium. Original PNG loads; flat fallback is explicit; tracking is clamped and viewport-relative; distant positions remain distinct; capture tracking crosses propagation-stopping controls; exit returns neutral; click/Enter/Space/Escape and focus restoration work; chat controls do not toggle the launcher; mobile/tablet containment, touch-only behavior and reduced motion pass. Mocked JSON/plain/SSE responses, split CRLF, safe text rendering, HTTP retry, stream interruption rejection, click-gated actions, multiple instances and removal cleanup pass. No browser runtime errors.
