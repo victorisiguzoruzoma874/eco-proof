@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { THEME_KEY } from "@/lib/theme";
+import { RobotAssistant } from "./RobotAssistant";
 
 export const metadata: Metadata = {
   title: "ProofChain",
@@ -38,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: applyStoredTheme }} />
       </head>
-      <body>{children}</body>
+      <body>{children}<RobotAssistant /></body>
     </html>
   );
 }

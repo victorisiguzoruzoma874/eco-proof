@@ -86,9 +86,12 @@ export default async function RequesterWalletPage({
     redeemed?: string;
     withdrawn?: string;
     itemRedeemed?: string;
+    reviewAmount?: string;
   }>;
 }) {
-  const { error, redeemed, withdrawn, itemRedeemed } = await searchParams;
+  const { error, redeemed, withdrawn, itemRedeemed, reviewAmount } = await searchParams;
+  const amount = Number(reviewAmount);
+  const reviewedAmount = reviewAmount && Number.isFinite(amount) && amount > 0 && amount <= 1000000 && Math.abs(amount * 1000 - Math.round(amount * 1000)) < 1e-7 ? amount : undefined;
 
   let viewer: Requester;
   try {
@@ -197,6 +200,8 @@ export default async function RequesterWalletPage({
             Amount (credits)
             <input
               id="amountCredits"
+              key={reviewedAmount ?? 'empty'}
+              defaultValue={reviewedAmount}
               name="amountCredits"
               type="number"
               step="0.001"

@@ -29,6 +29,7 @@ import { CreditRatesModule } from "./credit-rates/credit-rates.module";
 import { WithdrawalsModule } from "./withdrawals/withdrawals.module";
 import { CatalogModule } from "./catalog/catalog.module";
 import { RateLimitGuard } from "./common/rate-limit.guard";
+import { AssistantModule } from "./assistant/assistant.module";
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { RateLimitGuard } from "./common/rate-limit.guard";
       },
     }),
     AuthModule,
+    AssistantModule,
     UsersModule,
     RegistryModule,
     EventsModule,
