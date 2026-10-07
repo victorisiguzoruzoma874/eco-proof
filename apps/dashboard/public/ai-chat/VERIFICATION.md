@@ -1,4 +1,33 @@
-# Verification — 2026-10-06
+# Verification — 2026-10-07
+
+## Expanded workflows — production verification on 2026-10-07
+
+The expansion committed as `2c431e7` is now deployed successfully to Railway
+`proofchain-api`, deployment `012cf055-4abd-4732-aa74-d96cb11798b0`. Health reported
+`status: ok`, `database: up`, and a fresh process uptime. The deployed Vercel
+widget and host integration were verified through actual browser interaction.
+
+`ASSISTANT_TEST_WORKFLOWS=1 ASSISTANT_TEST_NEW_TOOLS=1 node e2e/assistant-live.mjs`
+passed against the production backend and dashboard:
+
+- Authenticated live DeepSeek balance answer and streamed replies.
+- Wallet-navigation button waits for a click and host confirmation.
+- The new `prepare_claim` tool produced a real SSE action, which opened the
+  existing form with the exact code after a click.
+- Pickup review retained exact hub, material, three-decimal kg weight, address
+  and notes; a second draft correctly refreshed the same form.
+- Reward review opened the existing item form without spending credits.
+- Claim and withdrawal review prefills, synchronized theme changes and rejection
+  of arbitrary external navigation passed.
+- Private pickup details and claim codes were absent from review URLs.
+- No form submissions or pickup/redemption/withdrawal records were created.
+- The temporary requester and its empty wallet were removed afterward.
+
+Financial submission remains intentionally excluded from these verification
+checks. The assistant still operates within requester permissions, available
+tools and the application's explicit final submission flows. It has no universal,
+operator/admin or arbitrary external access. These results supersede earlier
+limitations concerning live connectivity and review-prefill testing below.
 
 ## Railway activation — subsequent live checks
 
@@ -36,7 +65,7 @@ provider were both checked rather than inferred from compilation.
 
 The Windows sandbox initially prevented Vitest/esbuild from reading its config; the authorized test rerun with filesystem access passed. No test changed application balances or sent money.
 
-## Not live-verified
+## Original pre-activation limitations (superseded where verified above)
 
 - DeepSeek account/model access, provider latency, live tool facts and deployed streaming infrastructure. Provider calls in tests are mocked. Official current API/model documentation was checked; no live API call or production activation is claimed.
 - Full requester session-cookie-to-Nest integration against a running database, withdrawal form navigation/prefill and explicit final submission. These have compiled successfully and the component/action and server authorization paths have automated coverage, but require a staging end-to-end check.

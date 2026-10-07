@@ -1,5 +1,10 @@
 # Railway backend and DeepSeek assistant
 
+The expanded tools from commit `2c431e7` were deployed on 2026-10-07 and verified
+live on the Railway backend and Vercel dashboard. Deployment ID:
+`012cf055-4abd-4732-aa74-d96cb11798b0`. Both extended e2e flags below passed;
+see the widget's `VERIFICATION.md` for the exact checks and remaining limits.
+
 The existing `proofchain-backend` project / `proofchain-api` production service
 was successfully configured and deployed on 2026-10-06. Its public origin is
 `https://proofchain-api-production.up.railway.app`. The existing Vercel dashboard
@@ -45,9 +50,9 @@ on boot by default, as in the current backend; keep the service at one replica.
 For a secret supplied from a local secure prompt, Railway supports stdin:
 
 ```sh
-railway variable set DEEPSEEK_API_KEY --stdin --service backend --skip-deploys
-railway variable set DEEPSEEK_MODEL=deepseek-flash --service backend --skip-deploys
-railway up --service backend --detach
+railway variable set DEEPSEEK_API_KEY --stdin --service proofchain-api --skip-deploys
+railway variable set DEEPSEEK_MODEL=deepseek-flash --service proofchain-api --skip-deploys
+railway up --service proofchain-api --detach
 ```
 
 Do not put actual secrets in commands, tracked files, screenshots or chat. Use
