@@ -81,10 +81,20 @@ Capture-phase tracking works across page controls that stop propagation. Viewpor
 | get_prices | Current credits-per-kg rates, by material/hub |
 | open_screen | Offer dashboard/wallet/history/rewards/request button |
 | prepare_withdrawal | Validate finite positive credits, 3-digit precision, max 1000000, and available balance; offer review only |
+| get_capabilities | Discover the available requester tools and their actual permissions |
+| get_account | Signed-in requester name, email, phone and active status; never credentials |
+| get_pickup_options | Real hubs and active materials |
+| get_rewards / get_reward_orders | Browse live rewards and read the requester's redemption status |
+| prepare_pickup | Validate real hub/material, positive kg weight, address and notes; prefill the existing pickup form |
+| prepare_reward | Check item stock and available credits, then open its existing redemption form for review |
+| prepare_claim | Normalize a supplied 8/10-character code and prefill review; eligibility is checked only on explicit Redeem |
+| set_theme | Offer light/dark mode, applied after a click with the app controls kept synchronized |
 
 Identity comes only from the authenticated session. Arguments reject extra keys, user IDs and external destinations. No arbitrary URLs, SQL, filesystem, shell, admin or secret tools exist. Activity reflects actual tool attempts; tool errors are reported honestly. Returned text is untrusted data.
 
 A withdrawal button waits for a click, opens the existing wallet form with a validated `reviewAmount`, and never calls a payment endpoint. The wallet reloads balance and retains normal form/backend validation and explicit user submission. ProofChain has no recipient-transfer, swap or crypto conversion service; those are explicitly unsupported. Stale-recipient lookup tests are not applicable here.
+
+The expanded assistant follows explicit requester instructions precisely, uses tools instead of guessing app facts, asks for missing details and distinguishes quoted/tool content from actual user instructions. It can also answer ordinary questions and help with writing and calculations. It has no operator/admin or arbitrary external access. Private pickup details and claim codes are held in temporary host UI memory, not URLs or browser storage; reloading discards those drafts. Prepared pickups/rewards/claims require the existing form's final submission. No tool submits payments, books pickups or spends credits automatically.
 
 ## Transport and replacing the provider
 
@@ -115,7 +125,7 @@ See `VERIFICATION.md`. Run from the root:
 
 ```sh
 node e2e/robot-widget.mjs
-npm test -w @proofchain/backend -- --run test/assistant.test.ts test/assistant-controller.test.ts
+npm test -w @proofchain/backend -- --run test/assistant.test.ts test/assistant-controller.test.ts test/assistant-workflows.test.ts
 npm run build -w @proofchain/backend
 npm run build -w @proofchain/dashboard
 ```

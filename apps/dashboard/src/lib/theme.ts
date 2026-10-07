@@ -11,3 +11,9 @@
 export const THEME_KEY = "proofchain.dashboard.theme";
 
 export type Theme = "light" | "dark";
+export function applyDashboardTheme(theme: Theme) {
+  if (theme !== 'light' && theme !== 'dark') throw new Error('Unsupported theme.');
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem(THEME_KEY, theme); } catch { /* Current session still changes. */ }
+  window.dispatchEvent(new CustomEvent('proofchain:themechange', { detail: theme }));
+}

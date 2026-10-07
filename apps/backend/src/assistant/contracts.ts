@@ -1,6 +1,8 @@
 import { BadRequestException, HttpException } from '@nestjs/common';
 
 export type Message = { role: 'user' | 'assistant'; content: string };
+export class ToolInputError extends Error {}
+export const isUuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export function validateMessages(body: unknown): Message[] {
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).join() !== 'messages') throw new BadRequestException('Expected messages only.');
   const messages = (body as { messages: unknown }).messages;
@@ -14,7 +16,7 @@ export function validateMessages(body: unknown): Message[] {
   return messages;
 }
 export function objectArgs(args: unknown, keys: string[]) {
-  if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(k => !keys.includes(k))) throw new Error('Invalid tool arguments.');
+  if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(k => !keys.includes(k))) throw new ToolInputError('Invalid tool arguments.');
   return args as Record<string, unknown>;
 }
 export function validAmount(value: unknown): value is number {

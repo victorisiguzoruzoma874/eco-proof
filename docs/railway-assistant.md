@@ -9,6 +9,12 @@ Run `node e2e/assistant-live.mjs` for a live check using a temporary requester,
 which the script deletes afterward. It requires Railway login and production
 database access; it does not submit any payment.
 
+Set `ASSISTANT_TEST_WORKFLOWS=1` for additional host-form tests, and
+`ASSISTANT_TEST_NEW_TOOLS=1` to verify a real new-tool response and claim-code
+prefill. `ASSISTANT_TEST_DASHBOARD` can target a local production build instead
+of Vercel. Tests create no pickup, redemption or withdrawal records and remove
+their temporary requester and wallet.
+
 Deploy the backend from the repository root. The root `railway.json` builds only
 the backend workspace (its prebuild also builds shared types), starts the compiled
 Nest application, and checks `/health`. Do not set the service root to

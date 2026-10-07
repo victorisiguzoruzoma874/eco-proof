@@ -213,7 +213,17 @@
     }
     addAction(action, label) {
       const allowed = ['dashboard', 'wallet', 'history', 'rewards', 'request'];
-      const valid = action && (action.kind === 'navigate' && allowed.includes(action.target) && Object.keys(action).sort().join() === 'kind,target' || action.kind === 'review-withdrawal' && Object.keys(action).sort().join() === 'amountCredits,kind' && typeof action.amountCredits === 'number' && Number.isFinite(action.amountCredits) && action.amountCredits > 0 && action.amountCredits <= 1000000 && Math.abs(action.amountCredits * 1000 - Math.round(action.amountCredits * 1000)) < 1e-7);
+      const a = action;
+      const uuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+      const amount = (v, max=1000000) => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= max && Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-7;
+      const keys = (...names) => a && typeof a === 'object' && !Array.isArray(a) && Object.keys(a).every(k=>names.includes(k));
+      const valid = a && (
+        a.kind === 'navigate' && keys('kind','target') && allowed.includes(a.target) ||
+        a.kind === 'review-withdrawal' && keys('kind','amountCredits') && amount(a.amountCredits) ||
+        a.kind === 'review-reward' && keys('kind','itemId') && uuid(a.itemId) ||
+        a.kind === 'review-claim' && keys('kind','code') && typeof a.code === 'string' && /^(?:[A-HJ-NP-Z2-9]{8}|[A-HJ-NP-Z2-9]{10})$/.test(a.code) ||
+        a.kind === 'set-theme' && keys('kind','theme') && ['light','dark'].includes(a.theme) ||
+        a.kind === 'review-pickup' && keys('kind','hubId','material','estimatedWeightKg','address','notes') && uuid(a.hubId) && typeof a.material === 'string' && /^[A-Z0-9_-]{2,16}$/.test(a.material) && amount(a.estimatedWeightKg,100000) && typeof a.address === 'string' && !!a.address.trim() && a.address.length <= 500 && (a.notes === undefined || typeof a.notes === 'string' && a.notes.length <= 1000));
       if (!valid || typeof label !== 'string' || label.length > 200) throw new Error('Unsupported application action.');
       const button = document.createElement('button'); button.type = 'button'; button.className = 'action'; button.textContent = label; button.disabled = true;
       this.pendingActions.push(button); this.$('.history').append(button);

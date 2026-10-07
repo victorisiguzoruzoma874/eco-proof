@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CreditRate, HubDirectoryEntry, Material } from "@/lib/api";
 import { formatNaira, materialEmoji } from "@/lib/format";
 import { Emoji } from "@/app/Emoji";
 import { currentDefaultRates } from "@/lib/rates";
+import { readAssistantDraft } from '@/lib/assistant-actions';
 
 const STEP_KG = 0.5;
 
 function formatKgLocal(value: number): string {
-  return value.toFixed(1);
+  return value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 3 });
 }
 
 interface RequestFormProps {
@@ -34,10 +35,26 @@ interface RequestFormProps {
 export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFormProps) {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
+  const reviewToken = searchParams.get('assistantReview');
+  const [hubId, setHubId] = useState('');
+  const [address, setAddress] = useState('');
+  const [notes, setNotes] = useState('');
+  const [reviewNotice, setReviewNotice] = useState('');
 
   const [weights, setWeights] = useState<Record<string, number>>(() =>
     Object.fromEntries(materials.map((m) => [m.code, 0])),
   );
+  useEffect(() => {
+    if (!reviewToken) { setReviewNotice(''); return; }
+    const draft = readAssistantDraft(reviewToken);
+    if (!draft || draft.kind !== 'review-pickup' || !hubs.some(h => h.id === draft.hubId) || !materials.some(m => m.code === draft.material)) {
+      setReviewNotice('The assistant draft expired or its hub/material is unavailable. Enter the details again.');
+      return;
+    }
+    setHubId(draft.hubId); setAddress(draft.address); setNotes(draft.notes || '');
+    setWeights(Object.fromEntries(materials.map(m => [m.code, m.code === draft.material ? draft.estimatedWeightKg : 0])));
+    setReviewNotice('Prepared by the assistant. Review all details, then submit below. No pickup has been booked.');
+  }, [reviewToken, hubs, materials]);
 
   /**
    * The pickup pin, if the requester chooses to share it.
@@ -100,7 +117,7 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
 
   function adjust(code: string, delta: number) {
     setWeights((prev) => {
-      const next = Math.max(0, Math.round(((prev[code] ?? 0) + delta) * 10) / 10);
+      const next = Math.max(0, Math.round(((prev[code] ?? 0) + delta) * 1000) / 1000);
       return { ...prev, [code]: next };
     });
   }
@@ -123,6 +140,7 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
       </header>
 
       {error ? <p className="rq-error">{decodeURIComponent(error)}</p> : null}
+      {reviewNotice ? <p className="rq-note" role="status">{reviewNotice}</p> : null}
 
       <form action={requestPickup}>
         <section className="rq-section" style={{ paddingTop: 0 }}>
@@ -206,7 +224,7 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
         <section className="rq-section">
           <label className="rq-field" htmlFor="hubId">
             Hub
-            <select id="hubId" name="hubId" required defaultValue="">
+            <select id="hubId" name="hubId" required value={hubId} onChange={e => setHubId(e.target.value)}>
               <option value="" disabled>
                 Select a hub
               </option>
@@ -219,7 +237,7 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
           </label>
           <label className="rq-field" htmlFor="address">
             Address (optional, where the material can be picked up from)
-            <input id="address" name="address" maxLength={500} placeholder="Street and landmark" />
+            <input id="address" name="address" maxLength={500} placeholder="Street and landmark" value={address} onChange={e => setAddress(e.target.value)} />
           </label>
           <div className="rq-field">
             <span>Pickup location (optional)</span>
@@ -251,7 +269,7 @@ export function RequestForm({ hubs, materials, rates, requestPickup }: RequestFo
           </div>
           <label className="rq-field" htmlFor="notes">
             Notes (optional)
-            <textarea id="notes" name="notes" maxLength={1000} />
+            <textarea id="notes" name="notes" maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} />
           </label>
         </section>
 

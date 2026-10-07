@@ -48,9 +48,9 @@ function messageOf(error: unknown): string {
 export default async function RequesterRewardsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; redeemed?: string }>;
+  searchParams: Promise<{ error?: string; redeemed?: string; reviewItem?: string }>;
 }) {
-  const { error, redeemed } = await searchParams;
+  const { error, redeemed, reviewItem } = await searchParams;
 
   try {
     await requesterApi.me();
@@ -103,7 +103,8 @@ export default async function RequesterRewardsPage({
           {catalogItems.map((item) => {
             const outOfStock = item.stock !== null && item.stock <= 0;
             return (
-              <div key={item.id} className="rq-card">
+              <div key={item.id} className="rq-card" id={`reward-${item.id}`}>
+                {reviewItem === item.id ? <p className="rq-note" role="status">Review this reward and its current cost below. Nothing has been redeemed. Click Redeem only when you are ready to spend these credits.</p> : null}
                 <p className="rq-eyebrow">{item.category.toUpperCase()}</p>
                 <h3 style={{ margin: "0 0 0.375rem", fontSize: "1.0625rem" }}>{item.name}</h3>
                 {item.description ? (

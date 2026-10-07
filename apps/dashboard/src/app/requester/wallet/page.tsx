@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requesterApi, ApiError, type Requester, type WalletView } from "@/lib/api";
 import { formatDateTime, formatNaira } from "@/lib/format";
 import { ScanButton } from "./ScanButton";
+import { Suspense } from 'react';
+import { AssistantClaimInput } from './AssistantClaimInput';
 
 export const dynamic = "force-dynamic";
 
@@ -154,7 +156,7 @@ export default async function RequesterWalletPage({
       {itemRedeemed ? <p className="rq-note">Item redeemed. Awaiting fulfillment.</p> : null}
 
       <div className="rq-grid">
-      <section className="rq-section">
+      <section className="rq-section" id="claim-code">
         <h2>Redeem a code</h2>
         <p style={{ color: "var(--rq-text-soft)", marginBottom: "0.75rem" }}>
           Scan the QR your collector shows you, at your door or at the scale when you drop
@@ -170,17 +172,7 @@ export default async function RequesterWalletPage({
             {/* `rq-code-input` sets the mono face and the casing — see its rule
                 in requester.css for why a code is typed in mono and a label is
                 not. */}
-            <input
-              id="redemptionCode"
-              name="redemptionCode"
-              className="rq-code-input"
-              required
-              maxLength={16}
-              placeholder="7K9M2QRT"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-            />
+            <Suspense fallback={<input id="redemptionCode" name="redemptionCode" required maxLength={16} />}><AssistantClaimInput /></Suspense>
           </label>
           <button className="rq-btn" data-variant="primary" type="submit">
             Redeem

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { THEME_KEY, type Theme } from "@/lib/theme";
+import { applyDashboardTheme, type Theme } from "@/lib/theme";
 
 /**
  * Light/dark switch for the requester app.
@@ -31,6 +31,11 @@ export function ThemeToggle() {
       explicit ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
     );
   }, []);
+  useEffect(() => {
+    const change = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+    window.addEventListener('proofchain:themechange', change);
+    return () => window.removeEventListener('proofchain:themechange', change);
+  }, []);
 
   /** Follow the system only while the reader has not chosen for themselves. */
   useEffect(() => {
@@ -45,14 +50,8 @@ export function ThemeToggle() {
 
   function toggle() {
     const next: Theme = theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
+    applyDashboardTheme(next);
     setTheme(next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // A private window or blocked storage must still switch for this session;
-      // losing the preference is a far smaller failure than an inert button.
-    }
   }
 
   // Before mount the destination is genuinely unknown, so the control names its
