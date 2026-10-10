@@ -33,6 +33,27 @@ DEEPSEEK_MODEL=deepseek-flash
 
 Set dashboard `BACKEND_URL` to the existing backend origin. Requester pages use `/api/v1/assistant` by default. Operator pages use demo mode because they have a separate authorization boundary. `NEXT_PUBLIC_ASSISTANT_ENDPOINT` optionally overrides the public URL; never put a secret there. The Next session bridge reads the existing httpOnly requester cookie server-side, checks Origin, and forwards the application JWT. Nest verifies the JWT and rechecks the active requester. Browser code receives neither the JWT nor provider key. The standalone demo does not create a session.
 
+## Voice input
+
+Tap **Microphone**, allow browser microphone access, and speak. The message box
+shows the transcription as it develops. Tap **Stop**, edit the text if needed,
+then tap **Send**: the agent interprets it through the same conversation and tools
+used for typed messages. Dictation appends to an existing draft and never sends
+automatically. Closing the panel, hiding the tab, or removing the widget stops
+the microphone; sessions also stop after 60 seconds or the 4000-character limit.
+
+Voice input uses the browser's `SpeechRecognition` or `webkitSpeechRecognition`
+API and requires HTTPS (localhost is supported for development). Availability
+depends on the browser and its speech service; unsupported browsers can still
+use text chat. Recognition uses the widget's `lang`, the page language, or the
+browser language. Some browsers send audio to their own recognition service;
+ProofChain sends the resulting text to its existing assistant endpoint.
+
+Run `node e2e/assistant-voice.mjs` to check transcript updates, submission,
+permission/network failures, cleanup, length limits, and mobile layout with
+mocked speech events. Real microphone accuracy and browser permission prompts
+require a manual check in a supported browser.
+
 ## Embed on another website
 
 Copy this entire directory to your public assets:

@@ -25,6 +25,7 @@
           .history{flex:1;overflow:auto;padding:18px;overscroll-behavior:contain}.message{margin:0 0 12px;padding:11px 13px;border-radius:14px;background:#f0f5f6;white-space:pre-wrap;overflow-wrap:anywhere}.message.user{margin-left:26px;background:#dff8fa}.message.assistant{margin-right:18px}.speaker{display:block;font-size:10px;font-weight:700;margin-bottom:4px;color:#44606c}
           .status{padding:0 18px 10px;font-size:12px;color:#526b76}.status:empty{display:none}.error{color:#a22b35}.retry{margin-left:8px;border:1px solid #b6cbd0;border-radius:8px;background:white;padding:3px 8px}
           form{display:flex;gap:8px;padding:12px;border-top:1px solid #e6eef0;background:white}input{width:0;flex:1;min-height:42px;border:1px solid #cbdde1;border-radius:12px;padding:8px 12px;color:#142b38;background:white}.send{border:0;border-radius:12px;background:var(--accent);color:#073b43;font-weight:700;padding:8px 14px}.send:disabled{opacity:.5;cursor:wait}.foot{font-size:10px;text-align:center;color:#657d87;padding:0 12px 10px}
+          .microphone{display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid #365569;border-radius:12px;padding:8px;color:#d9fbff;background:#183b4b;font-size:11px}.microphone svg{width:16px;height:16px;flex-shrink:0}.microphone[aria-pressed="true"]{background:#653042;border-color:#ffabb8;color:#fff}.microphone:disabled{opacity:.5;cursor:wait}
           @keyframes float{50%{transform:translateY(-5px)}}@keyframes open{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
           @media(max-width:600px){:host{--size:80px;bottom:max(12px,env(safe-area-inset-bottom));right:max(12px,env(safe-area-inset-right))}:host([placement="left"]){left:max(12px,env(safe-area-inset-left))}.panel{width:calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));max-width:370px}}
           @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.launcher:hover .lift{transform:none}.pose,.head,.eyes{will-change:auto}}
@@ -34,7 +35,7 @@
           <header><img class="avatar" alt=""><div class="title"><h2 id="title"></h2><p class="mode"></p></div><button class="close" type="button" aria-label="Close assistant">×</button></header>
           <div class="history" role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions"></div>
           <div class="status" role="status" aria-live="polite"></div>
-          <form><input aria-label="Message the assistant" placeholder="Ask a question…" maxlength="4000" autocomplete="off"><button class="send" type="submit">Send</button></form>
+          <form><input aria-label="Message the assistant" placeholder="Ask a question…" maxlength="4000" autocomplete="off"><button class="microphone" type="button" aria-label="Start microphone" aria-pressed="false" title="Speak your message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg><span>Microphone</span></button><button class="send" type="submit">Send</button></form>
           <div class="foot"></div>
         </section>
         <button class="launcher" type="button" aria-label="Open assistant" aria-expanded="false" aria-haspopup="dialog"><div class="lift"><div class="float"><div class="pose"><img class="robot" alt=""><img class="layer body" alt=""><img class="layer head" alt=""><div class="eye-track"><img class="layer eyes" alt=""></div><img class="layer blink" alt=""></div></div></div><span class="ask" aria-hidden="true">ASK AI</span></button>`;
@@ -49,14 +50,15 @@
       listen(this.$('.launcher'), 'click', () => this.toggle());
       listen(this.$('.close'), 'click', () => this.toggle(false));
       listen(window, 'keydown', e => { if (e.key === 'Escape' && !this.$('.panel').hidden) { e.preventDefault(); this.toggle(false); } });
-      listen(this.$('form'), 'submit', e => { e.preventDefault(); const value = this.$('input').value.trim(); if (value && !this.busy) { this.$('input').value = ''; this.messages.push({ role: 'user', content: value }); this.addMessage('user', value); this.send(); } });
+      listen(this.$('.microphone'), 'click', () => this.toggleDictation());
+      listen(this.$('form'), 'submit', e => { e.preventDefault(); const value = this.$('input').value.trim(); if (value && !this.busy && !this.recognition) { this.$('input').value = ''; this.messages.push({ role: 'user', content: value }); this.addMessage('user', value); this.send(); } });
       listen(window, 'pointermove', e => {
         if (!this.canTrack() || e.pointerType === 'touch') return;
         this.pointer = { x: e.clientX, y: e.clientY }; this.updateTarget();
       }, { passive: true, capture: true });
       listen(document.documentElement, 'pointerleave', () => this.neutral());
       listen(window, 'blur', () => this.neutral());
-      listen(document, 'visibilitychange', () => { if (document.hidden) { this.neutral(); cancelAnimationFrame(this.frame); this.frame = 0; this.applyPose(0, 0); } });
+      listen(document, 'visibilitychange', () => { if (document.hidden) { this.cancelDictation(); this.neutral(); cancelAnimationFrame(this.frame); this.frame = 0; this.applyPose(0, 0); } });
       listen(window, 'scroll', () => this.updateTarget(), { passive: true, capture: true });
       listen(window, 'resize', () => this.resize(), { passive: true });
       if (window.visualViewport) { listen(visualViewport, 'resize', () => this.resize()); listen(visualViewport, 'scroll', () => this.resize()); }
@@ -66,6 +68,7 @@
       this.configure(); this.resize(); this.scheduleBlink();
     }
     disconnectedCallback() {
+      this.cancelDictation();
       this.lifecycle?.abort(); this.lifecycle = null; this.request?.abort(); this.observer?.disconnect(); for (const key of ['body','head','eyes']) { this.$(`.${key}`).onload = null; this.$(`.${key}`).onerror = null; }
       cancelAnimationFrame(this.frame); this.frame = 0; clearTimeout(this.blinkTimer); clearTimeout(this.unblinkTimer); clearTimeout(this.scheduleBlinkTimer); this.blinkAnimation?.cancel();
     }
@@ -163,6 +166,7 @@
       }, 3500 + Math.random() * 3500);
     }
     toggle(open = this.$('.panel').hidden) {
+      if (!open) this.cancelDictation();
       this.$('.panel').hidden = !open;
       this.$('.launcher').setAttribute('aria-expanded', String(open));
       this.$('.launcher').setAttribute('aria-label', `${open ? 'Close' : 'Open'} ${this.name}`);
@@ -177,10 +181,93 @@
     }
     scrollHistory() { this.$('.history').scrollTop = this.$('.history').scrollHeight; }
     status(text, error = false) { this.$('.status').textContent = text; this.$('.status').classList.toggle('error', error); }
+    updateDictationControls() {
+      const active = !!this.recognition;
+      const button = this.$('.microphone');
+      button.setAttribute('aria-pressed', String(active));
+      button.setAttribute('aria-label', active ? 'Stop microphone' : 'Start microphone');
+      button.title = active ? 'Stop listening and review your message' : 'Speak your message';
+      button.querySelector('span').textContent = active ? 'Stop' : 'Microphone';
+      button.disabled = !!this.busy || !!this.dictationStopping;
+      this.$('input').readOnly = !!this.busy || active;
+      this.$('.send').disabled = !!this.busy || active;
+    }
+    cancelDictation() {
+      const recognition = this.recognition;
+      this.recognition = null; this.dictationStopping = false;
+      clearTimeout(this.dictationTimer); clearTimeout(this.dictationStopTimer);
+      if (recognition) {
+        recognition.onstart = recognition.onresult = recognition.onerror = recognition.onend = null;
+        try { recognition.abort(); } catch {}
+        if (!this.busy) this.status('Microphone stopped. You can edit your message and send it.');
+      }
+      this.updateDictationControls();
+    }
+    toggleDictation() {
+      if (this.busy || this.dictationStopping) return;
+      if (this.recognition) {
+        this.dictationStopping = true; this.updateDictationControls();
+        this.status('Finishing transcription…');
+        try {
+          this.recognition.stop();
+          if (this.recognition) this.dictationStopTimer = setTimeout(() => this.cancelDictation(), 3000);
+        } catch { this.cancelDictation(); }
+        return;
+      }
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { this.status('Voice input is unavailable in this browser. Try a browser with speech recognition, or type your message.', true); return; }
+      if (!window.isSecureContext) { this.status('Microphone access needs a secure HTTPS connection. You can still type your message.', true); return; }
+      const input = this.$('input');
+      const base = input.value.trimEnd();
+      if (base.length >= input.maxLength) { this.status('Your message is full. Edit or send it before recording more.', true); return; }
+      let recognition;
+      try { recognition = new SpeechRecognition(); } catch { this.status('Could not start voice input. You can still type your message.', true); return; }
+      this.recognition = recognition;
+      recognition.lang = this.lang || document.documentElement.lang || navigator.language || 'en-NG';
+      recognition.continuous = true; recognition.interimResults = true; recognition.maxAlternatives = 1;
+      let heard = false, failed = false, truncated = false;
+      const current = () => this.recognition === recognition && this.isConnected;
+      recognition.onstart = () => { if (current()) this.status('Listening… Speak your message, then tap Stop.'); };
+      recognition.onresult = event => {
+        if (!current()) return;
+        // Rebuild this session's result list so interim revisions never duplicate words.
+        const transcript = Array.from(event.results, result => result[0]?.transcript || '').join(' ').trim();
+        heard = !!transcript;
+        const combined = [base, transcript].filter(Boolean).join(' ');
+        input.value = combined.slice(0, input.maxLength);
+        if (combined.length >= input.maxLength) { truncated = true; this.toggleDictation(); }
+      };
+      recognition.onerror = event => {
+        if (!current()) return;
+        failed = true;
+        const errors = {
+          'not-allowed': 'Microphone permission was denied. Allow microphone access in your browser and try again.',
+          'service-not-allowed': 'Speech recognition is disabled in this browser. You can still type your message.',
+          'audio-capture': 'No microphone is available. Connect a microphone and try again.',
+          'no-speech': 'No speech was detected. Tap Microphone and try speaking again.',
+          'network': 'Speech recognition could not connect. Check your connection and try again.',
+          'language-not-supported': 'Speech recognition does not support this language in your browser.',
+        };
+        this.cancelDictation();
+        this.status(errors[event.error] || 'Voice input stopped. You can edit the transcription or try again.', true);
+      };
+      recognition.onend = () => {
+        if (!current()) return;
+        this.recognition = null; this.dictationStopping = false;
+        clearTimeout(this.dictationTimer); clearTimeout(this.dictationStopTimer);
+        this.updateDictationControls();
+        if (!failed) this.status(truncated ? 'Message limit reached. Review your transcription and tap Send.' : heard ? 'Transcribed. Review your message and tap Send.' : 'No speech was detected. Tap Microphone to try again.');
+      };
+      this.updateDictationControls(); this.status('Starting microphone…');
+      try {
+        recognition.start();
+        if (this.recognition) this.dictationTimer = setTimeout(() => { if (current() && !this.dictationStopping) this.toggleDictation(); }, 60000);
+      } catch { this.cancelDictation(); this.status('Could not start the microphone. Check microphone access and try again.', true); }
+    }
     requestHistory() { let length = 0; const recent = []; for (const message of [...this.messages].reverse()) { if (recent.length >= 30 || length + message.content.length > 24000) break; recent.unshift(message); length += message.content.length; } return recent; }
     async send() {
       if (this.busy || !this.isConnected) return;
-      this.busy = true; this.$('input').focus({ preventScroll: true }); this.$('.send').disabled = true; this.$('input').readOnly = true; this.$('.history').setAttribute('aria-busy', 'true'); this.status('Preparing a reply…');
+      this.cancelDictation(); this.busy = true; this.updateDictationControls(); this.$('input').focus({ preventScroll: true }); this.$('.history').setAttribute('aria-busy', 'true'); this.status('Preparing a reply…');
       this.pendingActions = []; this.request = new AbortController(); let output = null; let result = '';
       const append = delta => { if (typeof delta !== 'string') throw new Error('Invalid response text.'); if (!delta) return; if (!output) output = this.addMessage('assistant', ''); result += delta; output.text.textContent = result; this.scrollHistory(); };
       try {
@@ -208,7 +295,7 @@
           const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'retry'; retry.textContent = 'Retry'; retry.addEventListener('click', () => this.send(), { signal: this.lifecycle.signal }); this.$('.status').append(retry);
         }
       } finally {
-        this.busy = false; this.$('.send').disabled = false; this.$('input').readOnly = false; this.$('.history').setAttribute('aria-busy', 'false');
+        this.busy = false; this.updateDictationControls(); this.$('.history').setAttribute('aria-busy', 'false');
       }
     }
     addAction(action, label) {
