@@ -61,7 +61,7 @@ Copy this entire directory to your public assets:
 ```html
 <script type="module" src="/ai-chat/robot-chat.js"></script>
 <robot-chat animated placement="left" size="104" accent="#42e5f5"
-  robot-src="/ai-chat/robot.png" assistant-name="App Assistant"
+  robot-src="/ai-chat/robot-3d.png" assistant-name="App Assistant"
   greeting="Hi! How can I help?" endpoint="/api/v1/assistant"
   offset-x="18" offset-y="104" z-index="1000"></robot-chat>
 ```
@@ -87,7 +87,11 @@ The working React wrapper is `src/app/RobotAssistant.tsx`. It uses Next routing,
 
 ## Character and animation
 
-`robot.png` is preserved unchanged. It is flattened, so the bundled character uses honest **whole-image tilt and float**, without independent eyes or blinking. No generated replacement or rough masks are shipped. Clean, visually verified original layers are still needed for independent animation of this exact artwork.
+`robot-3d.png` is the default transparent character, rendered with rounded white
+shells, a reflective dark visor, cyan facial lights, and studio shading for a more
+dimensional look. The original `robot.png` remains available. The bundled character
+uses whole-image tilt, cursor tracking, and floating; independent eyes or blinking
+require a separate aligned layer set.
 
 For a custom complete layer set, supply equally sized transparent canvases with identical registration:
 

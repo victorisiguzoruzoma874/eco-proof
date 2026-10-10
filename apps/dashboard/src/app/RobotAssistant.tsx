@@ -28,7 +28,7 @@ export function RobotAssistant() {
       performAction: (action: unknown) => Promise<string>;
     };
     widget.setAttribute("placement", "left");
-    widget.setAttribute("robot-src", "/ai-chat/robot.png");
+    widget.setAttribute("robot-src", "/ai-chat/robot-3d.png");
     widget.setAttribute("assistant-name", "ProofChain assistant");
     widget.setAttribute("offset-y", pathname.startsWith('/requester') ? '88' : '104');
     widget.requestAssistant = (url, init) => fetch(url, { ...init, credentials: 'same-origin' });

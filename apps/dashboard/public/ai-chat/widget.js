@@ -18,6 +18,7 @@
           .lift{width:100%;height:100%;transition:transform .25s,filter .25s}.launcher:hover .lift{transform:translateY(-4px);filter:brightness(1.08) drop-shadow(0 0 7px var(--accent))}
           .float{height:100%;animation:float 5s ease-in-out infinite}.pose{position:relative;width:100%;height:100%;transform-origin:50% 65%;will-change:transform}
           .robot,.layer{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}.head{transform-origin:50% 55%;will-change:transform}.eye-track{position:absolute;inset:0;transform-origin:50% 55%}.eyes{will-change:transform}.blink{opacity:0}.layered .robot{display:none}.pose:not(.layered) .layer,.pose:not(.layered) .eye-track{display:none}.layer:not([src]){display:none}
+          .robot{filter:drop-shadow(0 8px 8px #061b2938)}
           .ask{display:block;position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);border-radius:20px;background:#effcff;color:#376775;padding:3px 10px;font-size:10px;letter-spacing:.1em;white-space:nowrap}.badge{position:absolute;right:0;bottom:2px;width:13px;height:13px;background:var(--accent);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px #142b3830}
           .panel{position:absolute;bottom:calc(100% + 14px);right:0;width:min(370px,calc(100vw - 36px - env(safe-area-inset-left) - env(safe-area-inset-right)));height:min(510px,calc(var(--view-height,100dvh) - var(--size) - 64px - env(safe-area-inset-bottom) - env(safe-area-inset-top)));min-height:180px;background:#fff;border:1px solid #d9e8eb;border-radius:22px;box-shadow:0 20px 70px #102e3a30;display:flex;flex-direction:column;overflow:hidden;animation:open .2s ease-out}
           .panel{right:auto;left:0}:host([placement="right"]) .panel{right:0;left:auto}.panel[hidden]{display:none}
@@ -74,7 +75,7 @@
     }
     attributeChangedCallback() { if (this.lifecycle) { this.configure(); this.resize(); this.updateTarget(); this.scheduleBlink(); } }
     configure() {
-      const asset = this.getAttribute('robot-src') || new URL('robot.png', scriptBase).href;
+      const asset = this.getAttribute('robot-src') || new URL('robot-3d.png', scriptBase).href;
       this.$('.robot').src = asset; this.$('.avatar').src = asset;
       this.name = this.getAttribute('assistant-name') || 'ProofChain assistant';
       this.$('h2').textContent = this.name;
