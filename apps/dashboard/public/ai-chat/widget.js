@@ -126,7 +126,8 @@
     updateTarget() {
       if (!this.pointer || !this.canTrack()) return;
       const r = this.$('.launcher').getBoundingClientRect();
-      this.target = { x: Math.tanh((this.pointer.x - r.left - r.width / 2) / Math.max(innerWidth * .8, 320)), y: Math.tanh((this.pointer.y - r.top - r.height / 2) / Math.max(innerHeight * .8, 320)) };
+      // A smaller tracking radius makes nearby mouse movements easy to see.
+      this.target = { x: Math.tanh((this.pointer.x - r.left - r.width / 2) / clamp(innerWidth * .2, 120, 260)), y: Math.tanh((this.pointer.y - r.top - r.height / 2) / clamp(innerHeight * .2, 100, 200)) };
       this.animate();
     }
     neutral() { this.pointer = null; this.target = { x: 0, y: 0 }; if (!this.reduced?.matches) this.animate(); }
@@ -134,7 +135,7 @@
       if (this.frame || !this.isConnected || this.reduced?.matches || document.hidden) return;
       this.lastTime = 0;
       const tick = time => {
-        const factor = 1 - Math.exp(-Math.min(this.lastTime ? time - this.lastTime : 16, 64) / 90); this.lastTime = time;
+        const factor = 1 - Math.exp(-Math.min(this.lastTime ? time - this.lastTime : 16, 64) / 55); this.lastTime = time;
         const x = this.pose.x + (this.target.x - this.pose.x) * factor;
         const y = this.pose.y + (this.target.y - this.pose.y) * factor;
         this.applyPose(x, y);
@@ -144,11 +145,14 @@
     }
     applyPose(x, y) {
       this.pose = { x, y };
-      const rotate = `perspective(600px) rotateX(${-y * 6}deg) rotateY(${x * 8}deg) rotateZ(${x * 2}deg)`;
-      this.$('.pose').style.transform = this.layered ? '' : rotate;
+      const rotate = `perspective(450px) rotateX(${-y * 18}deg) rotateY(${x * 24}deg) rotateZ(${x * 10}deg)`;
+      const r = this.$('.launcher').getBoundingClientRect();
+      const shiftX = clamp(x * 16, Math.min(0, 12 - r.left), Math.max(0, innerWidth - r.right - 12));
+      const shiftY = clamp(y * 12, Math.min(0, 12 - r.top), Math.max(0, innerHeight - r.bottom - 12));
+      this.$('.pose').style.transform = `translate(${shiftX}px,${shiftY}px)${this.layered ? '' : ` ${rotate}`}`;
       this.$('.head').style.transform = this.layered ? rotate : '';
       this.$('.eye-track').style.transform = this.layered ? rotate : '';
-      const eyes = `translate(${x * 6}px,${y * 6}px)`;
+      const eyes = `translate(${x * 10}px,${y * 8}px)`;
       this.$('.eyes').style.transformOrigin = '50% 32%';
       this.$('.eyes').style.transform = this.layered ? eyes : ''; this.$('.blink').style.transform = this.layered ? eyes : '';
     }
