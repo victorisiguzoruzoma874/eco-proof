@@ -1,5 +1,14 @@
 # Reusable robot assistant
 
+The authenticated requester assistant can execute `book_pickup`, `redeem_reward`,
+`claim_credits`, and `request_withdrawal` directly when requested in chat. These
+tools call the existing application services using the verified requester ID;
+they retain ownership, stock, eligibility and balance checks. Withdrawal submission
+creates a pending request, and reward redemption may await fulfillment. The
+`prepare_*` tools below remain available for optional form review; their review-only
+descriptions do not apply to the direct execution tools. Operator/admin features
+still require a separate authenticated integration.
+
 Dependency-free Shadow DOM widget, original transparent robot asset, standalone demo, Next/React integration and authenticated NestJS DeepSeek backend. Default placement is left, size 104px (80px on mobile unless configured). ASK AI sits beneath the robot; the navy nonmodal panel is separate from the launcher.
 
 ## Install and configure

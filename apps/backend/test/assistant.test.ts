@@ -35,7 +35,7 @@ describe('assistant trust boundaries', () => {
   it('uses session identity and never mutates balances or submits withdrawals', async () => {
     const wallet = {getWallet:vi.fn().mockResolvedValue({balanceCredits:100,pendingWithdrawals:[{amountCredits:10}],transactions:[]})};
     const db = {manager:{find:vi.fn().mockResolvedValue([])}};
-    const tools = new AssistantTools(wallet as any, db as any);
+    const tools = new AssistantTools(wallet as any, db as any, {} as any, {} as any, {} as any);
     await tools.execute('get_balance',{},'session-user'); expect(wallet.getWallet).toHaveBeenCalledWith('session-user');
     await tools.execute('get_orders',{},'session-user'); expect(db.manager.find).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({where:{requesterId:'session-user'}}));
     expect(await tools.execute('prepare_withdrawal',{amountCredits:50},'session-user')).toMatchObject({action:{kind:'review-withdrawal',amountCredits:50}});

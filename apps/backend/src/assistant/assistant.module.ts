@@ -9,6 +9,9 @@ import { validateMessages, UserLimiter, ToolInputError } from './contracts';
 import { AssistantTools, TOOLS } from './tools';
 import { complete } from './deepseek';
 import { SYSTEM } from './policy';
+import { RequestsModule } from '../requests/requests.module';
+import { CatalogModule } from '../catalog/catalog.module';
+import { WithdrawalsModule } from '../withdrawals/withdrawals.module';
 
 @Controller('api/v1/assistant')
 export class AssistantController {
@@ -53,5 +56,5 @@ export class AssistantController {
     } finally { clearTimeout(timer); abort.abort(); res.off('close', cancel); req.off('aborted', cancel); res.end(); }
   }
 }
-@Module({ imports: [RequestersModule, WalletModule], controllers: [AssistantController], providers: [AssistantTools] })
+@Module({ imports: [RequestersModule, WalletModule, RequestsModule, CatalogModule, WithdrawalsModule], controllers: [AssistantController], providers: [AssistantTools] })
 export class AssistantModule {}

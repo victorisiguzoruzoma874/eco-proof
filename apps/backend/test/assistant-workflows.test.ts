@@ -8,7 +8,7 @@ const pickup = {hubId:id,material:'PET',estimatedWeightKg:5.345,address:'12 Exam
 function setup() {
   const wallet={getWallet:vi.fn().mockResolvedValue({balanceCredits:100,pendingWithdrawals:[],transactions:[]})};
   const manager={find:vi.fn().mockResolvedValue([]),findOne:vi.fn(),save:vi.fn(),update:vi.fn(),delete:vi.fn()};
-  return {wallet,manager,tools:new AssistantTools(wallet as any,{manager} as any)};
+  return {wallet,manager,tools:new AssistantTools(wallet as any,{manager} as any, {} as any, {} as any, {} as any)};
 }
 describe('expanded assistant workflows',()=>{
   it('reads profile and reward orders using only authenticated identity and safe fields',async()=>{

@@ -3,11 +3,19 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, LessThanOrEqual } from 'typeorm';
 import { CollectionRequestEntity, CreditRateEntity, HubEntity, MaterialEntity, RequesterEntity, CatalogItemEntity, CatalogRedemptionEntity } from '../database/entities';
 import { WalletService } from '../wallet/wallet.service';
+import { RequestsService } from '../requests/requests.service';
+import { CatalogService } from '../catalog/catalog.service';
+import { WithdrawalsService } from '../withdrawals/withdrawals.service';
+import type { CreateCollectionRequestDto } from '../common/dto';
 import { objectArgs, validAmount, isUuid, ToolInputError } from './contracts';
 
 export const SCREENS = ['dashboard', 'wallet', 'history', 'rewards', 'request'] as const;
 const definition = (name: string, description: string, properties = {}, required: string[] = []) => ({ type: 'function', function: { name, description, parameters: { type: 'object', properties, required, additionalProperties: false } } });
 export const TOOLS = [
+  definition('book_pickup', 'Book a pickup immediately when the user requests it. Resolve hub/material and collect weight/address first.', { hubId: { type: 'string', format: 'uuid' }, material: { type: 'string' }, estimatedWeightKg: { type: 'number' }, address: { type: 'string' }, notes: { type: 'string' } }, ['hubId', 'material', 'estimatedWeightKg', 'address']),
+  definition('redeem_reward', 'Spend credits and place a reward order immediately when requested by the user.', { itemId: { type: 'string', format: 'uuid' } }, ['itemId']),
+  definition('claim_credits', 'Redeem a user-supplied pickup or weigh-in code into their wallet immediately.', { code: { type: 'string' } }, ['code']),
+  definition('request_withdrawal', 'Submit a withdrawal request immediately for the user-specified credit amount. Actual payout is handled by operators.', { amountCredits: { type: 'number', minimum: 0.001, maximum: 1000000 } }, ['amountCredits']),
   definition('get_capabilities', 'Explain the precise operations available to this signed-in requester; no universal or admin access.'),
   definition('get_account', 'Read the signed-in requester profile without passwords or credentials.'),
   definition('get_pickup_options', 'List real collection hubs and active materials before choosing pickup details.'),
@@ -26,10 +34,35 @@ export const TOOLS = [
 ];
 @Injectable()
 export class AssistantTools {
-  constructor(private readonly wallet: WalletService, @InjectDataSource() private readonly db: DataSource) {}
+  constructor(private readonly wallet: WalletService, @InjectDataSource() private readonly db: DataSource,
+    private readonly requests: RequestsService, private readonly catalog: CatalogService,
+    private readonly withdrawals: WithdrawalsService) {}
   async execute(name: string, input: unknown, user: string) {
     switch (name) {
-      case 'get_capabilities': { objectArgs(input, []); return { tools: TOOLS.map(t => ({ name: t.function.name, description: t.function.description })), permissions: 'Requester account only. Live reads run directly; UI actions wait for a click; operations use existing forms and explicit final submission.' }; }
+      case 'get_capabilities': { objectArgs(input, []); return { tools: TOOLS.map(t => ({ name: t.function.name, description: t.function.description })), permissions: 'Authenticated requester account. Booking, reward redemption, claims and withdrawal requests execute directly when requested. Prepare tools offer optional form review. UI actions wait for a click. Existing service validation and account ownership apply.' }; }
+      case 'book_pickup': {
+        const prepared = await this.execute('prepare_pickup', input, user) as { action: Record<string, unknown> };
+        const { kind, ...details } = prepared.action;
+        const request = await this.requests.create(user, details as unknown as CreateCollectionRequestDto);
+        return { status: 'Booked', requestId: request.id, pickupStatus: request.status, hubId: request.hubId, material: request.material, estimatedWeightKg: request.estimatedWeightKg, address: request.address };
+      }
+      case 'redeem_reward': {
+        await this.execute('prepare_reward', input, user);
+        const a = objectArgs(input, ['itemId']);
+        const result = await this.catalog.redeem(user, a.itemId as string);
+        return { status: 'Redeemed', orderId: result.redemption.id, fulfillmentStatus: result.redemption.status, balanceCredits: result.balanceCredits };
+      }
+      case 'claim_credits': {
+        const prepared = await this.execute('prepare_claim', input, user) as { action: { code: string } };
+        const result = await this.wallet.redeem(user, prepared.action.code);
+        return { status: 'Claimed', amountCredits: result.transaction.amountCredits, balanceCredits: result.balanceCredits };
+      }
+      case 'request_withdrawal': {
+        await this.execute('prepare_withdrawal', input, user);
+        const a = objectArgs(input, ['amountCredits']);
+        const request = await this.withdrawals.request(user, a.amountCredits as number);
+        return { status: 'Submitted', withdrawalId: request.id, withdrawalStatus: request.status, amountCredits: request.amountCredits, paid: false };
+      }
       case 'get_account': {
         objectArgs(input, []);
         const profile = await this.db.manager.findOne(RequesterEntity, { where: { id: user }, select: { name: true, email: true, phone: true, active: true } });
