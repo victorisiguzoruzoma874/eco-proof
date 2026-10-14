@@ -1,4 +1,6 @@
 import { BadRequestException, HttpException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
 
 export type Message = { role: 'user' | 'assistant'; content: string };
 export class ToolInputError extends Error {}
@@ -18,6 +20,20 @@ export function validateMessages(body: unknown): Message[] {
 export function objectArgs(args: unknown, keys: string[]) {
   if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(k => !keys.includes(k))) throw new ToolInputError('Invalid tool arguments.');
   return args as Record<string, unknown>;
+}
+/** Same rules as the global ValidationPipe, applied to model-supplied tool input. */
+export function dtoArgs<T extends object>(cls: new () => T, args: unknown): T {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new ToolInputError('Invalid tool arguments.');
+  const instance = plainToInstance(cls, args, { enableImplicitConversion: false });
+  const errors = validateSync(instance, { whitelist: true, forbidNonWhitelisted: true });
+  if (errors.length) throw new ToolInputError(errors.flatMap(e => Object.values(e.constraints ?? {})).slice(0, 3).join('; ') || 'Invalid tool arguments.');
+  return Object.fromEntries(Object.entries(instance).filter(([, v]) => v !== undefined)) as T;
+}
+export function idArgs(args: unknown, key: string) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw new ToolInputError('Invalid tool arguments.');
+  const { [key]: id, ...rest } = args as Record<string, unknown>;
+  if (!isUuid(id)) throw new ToolInputError(`${key} must be a real id from a list tool.`);
+  return { id, rest };
 }
 export function validAmount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1000000 && Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-7;
