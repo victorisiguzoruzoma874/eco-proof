@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { ASSISTANT_SCREENS, clearAssistantDrafts, saveAssistantDraft, validateAssistantAction } from '@/lib/assistant-actions';
 import { applyDashboardTheme } from '@/lib/theme';
 
+const endpointFor = (path: string) => process.env.NEXT_PUBLIC_ASSISTANT_ENDPOINT || (path.startsWith('/requester/') ? '/api/v1/assistant' : path.startsWith('/requester') || path.endsWith('/login') ? '' : '/api/v1/assistant/staff');
+
 /** The standalone widget owns its Shadow DOM, listeners, and request lifecycle. */
 export function RobotAssistant() {
   const mount = useRef<HTMLDivElement>(null);
@@ -17,7 +19,7 @@ export function RobotAssistant() {
     const widget = mount.current?.querySelector('proofchain-chat');
     if (!widget) return;
     widget.setAttribute('offset-y', pathname.startsWith('/requester') ? '88' : '104');
-    const endpoint = process.env.NEXT_PUBLIC_ASSISTANT_ENDPOINT || (pathname.startsWith('/requester/') ? '/api/v1/assistant' : '');
+    const endpoint = endpointFor(pathname);
     if (endpoint) widget.setAttribute('endpoint', endpoint); else widget.removeAttribute('endpoint');
   }, [pathname, ready]);
   useEffect(() => {
@@ -38,6 +40,13 @@ export function RobotAssistant() {
         applyDashboardTheme(action.theme);
         if (document.documentElement.dataset.theme !== action.theme) throw new Error('Display change was not confirmed.');
         return `${action.theme === 'dark' ? 'Dark' : 'Light'} mode applied.`;
+      }
+      if (action.kind === 'confirm-admin') {
+        const response = await fetch(`/api/v1/assistant/staff/confirm/${action.id}`, { method: 'POST', credentials: 'same-origin' });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || 'The change could not be applied.');
+        router.refresh();
+        return body.temporaryPassword ? `Done: ${body.summary}. Temporary password (copy it now, shown once): ${body.temporaryPassword}` : `Done: ${body.summary}.`;
       }
       let target: string;
       if (action.kind === 'navigate') target = ASSISTANT_SCREENS[action.target]!;
@@ -65,7 +74,7 @@ export function RobotAssistant() {
       if (action.kind === 'navigate') return 'Application screen opened.';
       return 'Review form opened with your details. Nothing booked, redeemed, submitted or paid.';
     };
-    const endpoint = process.env.NEXT_PUBLIC_ASSISTANT_ENDPOINT || (pathname.startsWith('/requester/') ? '/api/v1/assistant' : '');
+    const endpoint = endpointFor(pathname);
     if (endpoint) widget.setAttribute("endpoint", endpoint);
     container.append(widget);
     return () => widget.remove();
