@@ -10,7 +10,7 @@ import type { CreateCollectionRequestDto } from '../common/dto';
 import { objectArgs, validAmount, isUuid, ToolInputError } from './contracts';
 
 export const SCREENS = ['dashboard', 'wallet', 'history', 'rewards', 'request'] as const;
-const definition = (name: string, description: string, properties = {}, required: string[] = []) => ({ type: 'function', function: { name, description, parameters: { type: 'object', properties, required, additionalProperties: false } } });
+export const definition = (name: string, description: string, properties = {}, required: string[] = []) => ({ type: 'function', function: { name, description, parameters: { type: 'object', properties, required, additionalProperties: false } } });
 export const TOOLS = [
   definition('book_pickup', 'Book a pickup immediately when the user requests it. Resolve hub/material and collect weight/address first.', { hubId: { type: 'string', format: 'uuid' }, material: { type: 'string' }, estimatedWeightKg: { type: 'number' }, address: { type: 'string' }, notes: { type: 'string' } }, ['hubId', 'material', 'estimatedWeightKg', 'address']),
   definition('redeem_reward', 'Spend credits and place a reward order immediately when requested by the user.', { itemId: { type: 'string', format: 'uuid' } }, ['itemId']),
