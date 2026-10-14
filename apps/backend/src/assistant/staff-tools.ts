@@ -118,7 +118,8 @@ export class StaffAssistantTools {
 
   private async prepareAdmin(name: string, input: unknown, actor: JwtPayload) {
     const args = this.adminArgs(name, input);
-    const summary = (await this.describe(name, args)).slice(0, 180);
+    const summary = await this.describe(name, args);
+    if (summary.length > 180) throw new ToolInputError('This change is too long to show in one confirmation. Shorten the text fields or split it into separate changes.');
     const op = this.pending.create({ actorId: actor.sub, tool: name, args, summary });
     return { action: { kind: 'confirm-admin', id: op.id }, label: `Confirm: ${summary}`, status: 'Awaiting the admin’s Confirm click. Nothing has changed yet; do not report it as done.' };
   }

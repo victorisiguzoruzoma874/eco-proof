@@ -71,6 +71,13 @@ describe('staff assistant tools', () => {
     expect(done.result.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{16}$/);
     expect(t.s.users.create).toHaveBeenCalledWith({ email: 'n@x.test', role: 'operator', password: done.result.temporaryPassword });
   });
+  it('rejects over-long confirmations instead of truncating them', async () => {
+    const t = setup(); const create = vi.spyOn(t.pending, 'create');
+    await expect(t.tools.execute('update_material', { code: 'PET', description: 'x'.repeat(170), active: false }, admin)).rejects.toThrow('too long to show in one confirmation');
+    expect(create).not.toHaveBeenCalled(); expect(t.s.materials.update).not.toHaveBeenCalled();
+    const ok: any = await t.tools.execute('update_material', { code: 'PET', description: 'short', active: false }, admin);
+    expect(ok.label).toContain('"active":false'); expect(ok.label).toContain('short');
+  });
   it('lets service conflicts propagate', async () => {
     const t = setup(); t.s.reweigh.create = vi.fn().mockRejectedValue(new ConflictException('event already has a reweigh'));
     await expect(t.tools.execute('record_reweigh', { eventId: id, verifiedWeightKg: 1 }, operator)).rejects.toThrow('already has a reweigh');
