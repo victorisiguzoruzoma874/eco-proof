@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ASSISTANT_SCREENS, clearAssistantDrafts, saveAssistantDraft, validateAssistantAction } from '@/lib/assistant-actions';
 import { applyDashboardTheme } from '@/lib/theme';
 
-const endpointFor = (path: string) => process.env.NEXT_PUBLIC_ASSISTANT_ENDPOINT || (path.startsWith('/requester/') ? '/api/v1/assistant' : path.startsWith('/requester') || path.endsWith('/login') ? '' : '/api/v1/assistant/staff');
+const endpointFor = (path: string) => path.startsWith('/requester/') ? process.env.NEXT_PUBLIC_ASSISTANT_ENDPOINT || '/api/v1/assistant' : (path.startsWith('/requester') || path.endsWith('/login') ? '' : '/api/v1/assistant/staff');
 
 /** The standalone widget owns its Shadow DOM, listeners, and request lifecycle. */
 export function RobotAssistant() {

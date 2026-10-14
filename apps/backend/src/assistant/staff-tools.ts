@@ -1,11 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, GoneException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { randomBytes } from 'node:crypto';
 import { isEmail } from 'class-validator';
 import { BATCH_STATUSES, type BatchStatus } from '@proofchain/shared';
 import type { JwtPayload, Role } from '../auth/auth.module';
-import { HubEntity } from '../database/entities';
+import { HubEntity, MaterialEntity } from '../database/entities';
 import { BatchesService } from '../batches/batches.service';
 import { EventsService } from '../events/events.service';
 import { ReportsService } from '../reports/reports.service';
@@ -112,13 +112,16 @@ export class StaffAssistantTools {
     // Role first, so a demoted admin's click does not consume the op.
     if (actor.role !== 'admin') throw new ForbiddenException('Only an admin can confirm admin changes.');
     const op = this.pending.take(opId, actor.sub);
-    if (!op) throw new NotFoundException('This confirmation expired, was already used, or belongs to another admin. Ask the assistant again.');
+    if (!op) throw new GoneException('This confirmation expired, was already used, or belongs to another admin. Ask the assistant again.');
     return { summary: op.summary, result: await this.runAdmin(op.tool, op.args, actor) };
   }
 
   private async prepareAdmin(name: string, input: unknown, actor: JwtPayload) {
     const args = this.adminArgs(name, input);
-    const summary = await this.describe(name, args);
+    if (name === 'update_user' && args.userId === actor.sub && (args.active === false || args.role !== undefined)) throw new ToolInputError('You cannot change your own role or deactivate yourself here.');
+    const materialCode = name === 'update_material' ? args.code : name === 'create_material_rate' || name === 'create_credit_rate' ? args.materialCode : undefined;
+    if (materialCode !== undefined && !(await this.db.manager.findOne(MaterialEntity, { where: { code: String(materialCode).toUpperCase() } }))) throw new ToolInputError('Unknown material; use list_materials.');
+    const summary = (await this.describe(name, args)) + this.leftovers(name, args);
     if (summary.length > 180) throw new ToolInputError('This change is too long to show in one confirmation. Shorten the text fields or split it into separate changes.');
     const op = this.pending.create({ actorId: actor.sub, tool: name, args, summary });
     return { action: { kind: 'confirm-admin', id: op.id }, label: `Confirm: ${summary}`, status: 'Awaiting the admin’s Confirm click. Nothing has changed yet; do not report it as done.' };
@@ -174,6 +177,17 @@ export class StaffAssistantTools {
     }
   }
 
+  /** Every written field the readable prefix does not already show, so the label is the whole change. */
+  private leftovers(name: string, a: Record<string, any>) {
+    const shown: Record<string, string[]> = {
+      create_hub: ['code', 'name'], create_material: ['code', 'name'], update_material: Object.keys(a),
+      create_material_rate: ['materialCode', 'ratePerKg', 'hubId', 'effectiveFrom'], create_credit_rate: ['materialCode', 'creditsPerKg', 'hubId', 'effectiveFrom'],
+      create_catalog_item: ['name', 'category', 'costCredits', 'stock'], create_user: ['email', 'role'], update_user: ['userId', 'role', 'active'],
+    };
+    const rest = Object.fromEntries(Object.entries(a).filter(([k]) => !shown[name]?.includes(k)));
+    return Object.keys(rest).length ? ` · ${JSON.stringify(rest)}` : '';
+  }
+
   private async hubLabel(hubId: string) {
     const hub = await this.db.manager.findOne(HubEntity, { where: { id: hubId } });
     if (!hub) throw new ToolInputError('Unknown hub; use list_hubs.');
@@ -206,7 +220,7 @@ export class StaffAssistantTools {
       case 'get_batch': return this.batches.findOne(onlyId(input, 'batchId'));
       case 'get_batch_events': { const { id: batchId, rest } = idArgs(input, 'batchId'); const a = objectArgs(rest, ['limit']); return clip(await this.batches.eventsOf(batchId), a.limit); }
       case 'get_batch_report': return this.reports.buildAuditReport(onlyId(input, 'batchId'));
-      case 'list_events': { const a = objectArgs(input, ['hubId', 'collectorId', 'batched', 'quarantined', 'hasPhoto', 'limit']); const n = lim(a.limit); return clip(await this.events.list({ hubId: optId(a.hubId, 'hubId'), collectorId: optId(a.collectorId, 'collectorId'), batched: optBool(a.batched, 'batched'), quarantined: optBool(a.quarantined, 'quarantined'), hasPhoto: optBool(a.hasPhoto, 'hasPhoto'), limit: n }), n); }
+      case 'list_events': { const a = objectArgs(input, ['hubId', 'collectorId', 'batched', 'quarantined', 'hasPhoto', 'limit']); const n = lim(a.limit); const rows = (await this.events.list({ hubId: optId(a.hubId, 'hubId'), collectorId: optId(a.collectorId, 'collectorId'), batched: optBool(a.batched, 'batched'), quarantined: optBool(a.quarantined, 'quarantined'), hasPhoto: optBool(a.hasPhoto, 'hasPhoto'), limit: n + 1 })) as unknown[]; return { showing: Math.min(n, rows.length), more: rows.length > n, rows: rows.slice(0, n) }; }
       case 'get_event': { const eventId = onlyId(input, 'eventId'); const [event, reweighs] = await Promise.all([this.events.findOne(eventId), this.reweigh.list(eventId)]); return { event, reweighs }; }
       case 'list_payouts': { const a = objectArgs(input, ['collectorId', 'limit']); return clip(await this.payouts.list(optId(a.collectorId, 'collectorId')), a.limit); }
       case 'get_payout': return this.payouts.findOne(onlyId(input, 'payoutId'));

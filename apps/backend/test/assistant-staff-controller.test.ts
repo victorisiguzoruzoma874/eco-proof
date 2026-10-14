@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConflictException, InternalServerErrorException } from '@nestjs/common';
@@ -34,5 +35,9 @@ describe('staff assistant controller', () => {
     const user = { sub: 'admin-1', email: 'a@x.test', role: 'admin' as const };
     await new StaffAssistantController(tools as any).confirm('e8ec812e-8ad6-43ec-a7ef-17dc87c7e710', user);
     expect(tools.confirm).toHaveBeenCalledWith('e8ec812e-8ad6-43ec-a7ef-17dc87c7e710', user);
+  });
+  it('guards routes by role metadata', () => {
+    expect(Reflect.getMetadata('roles', StaffAssistantController.prototype.confirm)).toEqual(['admin']);
+    expect(Reflect.getMetadata('roles', StaffAssistantController.prototype.chat)).toEqual(['admin', 'operator', 'auditor']);
   });
 });

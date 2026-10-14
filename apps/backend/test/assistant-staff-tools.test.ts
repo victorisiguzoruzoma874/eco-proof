@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
+import { ForbiddenException, GoneException, ConflictException } from '@nestjs/common';
 import { StaffAssistantTools, toolsFor } from '../src/assistant/staff-tools';
 import { PendingAdminOps } from '../src/assistant/pending';
 const id = 'e8ec812e-8ad6-43ec-a7ef-17dc87c7e710';
@@ -11,9 +11,10 @@ function setup() {
   const s = { batches: svc(), events: svc(), reports: svc(), custody: svc(), reweigh: svc(), requests: svc(), withdrawals: svc(), payouts: svc(), catalog: svc(), registry: svc(), materials: svc(), materialRates: svc(), creditRates: svc(), users: svc() } as any;
   s.events.list = vi.fn().mockResolvedValue(Array.from({ length: 120 }, (_, i) => ({ id: i })));
   const db = { manager: { findOne: vi.fn().mockResolvedValue({ id, name: 'Lagos', code: 'LAG' }) } };
+  s.users.findOne = vi.fn().mockResolvedValue({ id, email: 't@x.test' });
   const pending = new PendingAdminOps();
   const tools = new StaffAssistantTools(db as any, pending, s.batches, s.events, s.reports, s.custody, s.reweigh, s.requests, s.withdrawals, s.payouts, s.catalog, s.registry, s.materials, s.materialRates, s.creditRates, s.users);
-  return { s, tools, pending };
+  return { s, tools, pending, db };
 }
 const names = (role: any) => toolsFor(role).map(t => t.function.name);
 describe('staff assistant tools', () => {
@@ -42,7 +43,9 @@ describe('staff assistant tools', () => {
   });
   it('clips large lists', async () => {
     const t = setup();
-    expect(await t.tools.execute('list_events', {}, auditor)).toMatchObject({ total: 120, showing: 10 });
+    expect(await t.tools.execute('list_events', {}, auditor)).toMatchObject({ showing: 10, more: true });
+    expect(t.s.events.list).toHaveBeenCalledWith(expect.objectContaining({ limit: 11 }));
+    expect(await t.tools.execute('list_events', {}, auditor)).not.toHaveProperty('total');
     await expect(t.tools.execute('list_events', { limit: 51 }, auditor)).rejects.toThrow('limit');
   });
   it('prepares admin changes without executing them, then executes once on confirm', async () => {
@@ -51,10 +54,10 @@ describe('staff assistant tools', () => {
     expect(prepared.action.kind).toBe('confirm-admin');
     expect(prepared.label).toContain('Lagos');
     expect(t.s.creditRates.create).not.toHaveBeenCalled();
-    await expect(t.tools.confirm(prepared.action.id, { ...admin, sub: 'admin-2' })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(t.tools.confirm(prepared.action.id, { ...admin, sub: 'admin-2' })).rejects.toBeInstanceOf(GoneException);
     expect(await t.tools.confirm(prepared.action.id, admin)).toMatchObject({ summary: expect.stringContaining('PET') });
     expect(t.s.creditRates.create).toHaveBeenCalledWith({ materialCode: 'PET', hubId: id, creditsPerKg: 120 });
-    await expect(t.tools.confirm(prepared.action.id, admin)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(t.tools.confirm(prepared.action.id, admin)).rejects.toBeInstanceOf(GoneException);
   });
   it('refuses confirmation after demotion without consuming the op', async () => {
     const t = setup();
@@ -77,6 +80,28 @@ describe('staff assistant tools', () => {
     expect(create).not.toHaveBeenCalled(); expect(t.s.materials.update).not.toHaveBeenCalled();
     const ok: any = await t.tools.execute('update_material', { code: 'PET', description: 'short', active: false }, admin);
     expect(ok.label).toContain('"active":false'); expect(ok.label).toContain('short');
+  });
+  it('shows every written field in the confirm label', async () => {
+    const t = setup();
+    const hub: any = await t.tools.execute('create_hub', { code: 'ABJ', name: 'Abuja', minWeightKg: 0.5, maxWeightKg: 0.1 }, admin);
+    expect(hub.label).toContain('"maxWeightKg":0.1'); expect(hub.label).toContain('"minWeightKg":0.5');
+    const mat: any = await t.tools.execute('create_material', { code: 'GLS', name: 'Glass', active: false, sortOrder: 3, description: 'bottles', examples: ['jar'] }, admin);
+    for (const v of ['"active":false', '"sortOrder":3', 'bottles', 'jar']) expect(mat.label).toContain(v);
+    const item: any = await t.tools.execute('create_catalog_item', { name: 'Bag', category: 'goods', costCredits: 5, description: 'tote bag' }, admin);
+    expect(item.label).toContain('tote bag');
+    const rate: any = await t.tools.execute('create_material_rate', { materialCode: 'PET', ratePerKg: 2, effectiveFrom: '2026-01-01T00:00:00.000Z' }, admin);
+    expect(rate.label).toContain('2026-01-01');
+  });
+  it('rejects prepares that must fail at confirm', async () => {
+    const t = setup();
+    await expect(t.tools.execute('update_user', { userId: id, active: false }, { ...admin, sub: id })).rejects.toThrow('You cannot change your own role or deactivate yourself here.');
+    await expect(t.tools.execute('update_user', { userId: id, role: 'auditor' }, { ...admin, sub: id })).rejects.toThrow('own role');
+    expect(await t.tools.execute('update_user', { userId: id, active: false }, admin)).toHaveProperty('action');
+    t.s.users.findOne = vi.fn().mockRejectedValue(new Error('User not found'));
+    await expect(t.tools.execute('update_user', { userId: id, active: false }, admin)).rejects.toThrow();
+    t.db.manager.findOne.mockResolvedValue(null);
+    for (const [n, a] of [['update_material', { code: 'NOPE', active: false }], ['create_material_rate', { materialCode: 'NOPE', ratePerKg: 1 }], ['create_credit_rate', { materialCode: 'NOPE', creditsPerKg: 1 }]] as const)
+      await expect(t.tools.execute(n, a, admin)).rejects.toThrow('Unknown material; use list_materials.');
   });
   it('lets service conflicts propagate', async () => {
     const t = setup(); t.s.reweigh.create = vi.fn().mockRejectedValue(new ConflictException('event already has a reweigh'));

@@ -10,7 +10,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const upstream = await fetch(`${BACKEND_URL}/api/v1/assistant/staff/confirm/${id}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
     const body = await upstream.json().catch(() => ({}));
-    if (!upstream.ok) return Response.json({ error: upstream.status === 403 ? 'Only an admin can confirm this change.' : upstream.status === 404 ? 'This confirmation expired or was already used. Ask the assistant again.' : upstream.status < 500 && typeof body.message === 'string' ? body.message : 'The change could not be applied. Please retry.' }, { status: upstream.status });
+    if (!upstream.ok) {
+      const m = body.message, detail = typeof m === 'string' ? m : Array.isArray(m) && m.every((x: unknown) => typeof x === 'string') ? m.join('; ') : '';
+      const error = upstream.status === 403 ? 'Only an admin can confirm this change.'
+        : upstream.status === 410 ? 'This confirmation expired or was already used. Ask the assistant again.'
+        : upstream.status === 401 ? 'Your session expired. Sign in again.'
+        : upstream.status < 500 && detail ? detail : 'The change could not be applied. Please retry.';
+      return Response.json({ error }, { status: upstream.status });
+    }
     return Response.json({ summary: body.summary, temporaryPassword: body.result?.temporaryPassword });
   } catch { return Response.json({ error: 'The change could not be applied. Please retry.' }, { status: 503 }); }
 }

@@ -321,10 +321,10 @@
       const button = document.createElement('button'); button.type = 'button'; button.className = 'action'; button.textContent = label; button.disabled = true;
       this.pendingActions.push(button); this.$('.history').append(button);
       button.addEventListener('click', async () => {
-        button.disabled = true;
-        try { if (!this.performAction) throw new Error('This website has not connected application actions.'); const status = await this.performAction(Object.freeze({...action})); if (typeof status !== 'string') throw new Error('The application did not confirm this action.'); if (this.isConnected) this.status(status); }
+        button.disabled = true; let spent = false;
+        try { if (!this.performAction) throw new Error('This website has not connected application actions.'); const status = await this.performAction(Object.freeze({...action})); if (typeof status !== 'string') throw new Error('The application did not confirm this action.'); if (this.isConnected) { this.status(status); if (action.kind === 'confirm-admin') this.addMessage('assistant', status); } spent = action.kind === 'confirm-admin'; }
         catch (error) { if (this.isConnected) this.status(error.message || 'Could not open the application screen.', true); }
-        finally { button.disabled = false; }
+        finally { button.disabled = spent; }
       }, {signal: this.lifecycle.signal});
     }
     async readStream(response, append, sse) {
