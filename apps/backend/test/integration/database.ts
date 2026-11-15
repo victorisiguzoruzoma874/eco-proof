@@ -22,6 +22,10 @@ import { CreditRates1787700000000 } from "../../src/database/migrations/17877000
 import { WithdrawalRequests1787800000000 } from "../../src/database/migrations/1787800000000-WithdrawalRequests";
 import { CatalogItems1787900000000 } from "../../src/database/migrations/1787900000000-CatalogItems";
 import { CatalogRedemptions1788000000000 } from "../../src/database/migrations/1788000000000-CatalogRedemptions";
+import { DoorstepCollection1788100000000 } from "../../src/database/migrations/1788100000000-DoorstepCollection";
+import { WeighInClaims1788200000000 } from "../../src/database/migrations/1788200000000-WeighInClaims";
+import { CatalogNamesWithoutPrices1788300000000 } from "../../src/database/migrations/1788300000000-CatalogNamesWithoutPrices";
+import { SignupRequests1788400000000 } from "../../src/database/migrations/1788400000000-SignupRequests";
 
 /**
  * Migrations are listed as classes rather than as the `src/**\/migrations/*.ts`
@@ -53,6 +57,10 @@ const MIGRATIONS = [
   WithdrawalRequests1787800000000,
   CatalogItems1787900000000,
   CatalogRedemptions1788000000000,
+  DoorstepCollection1788100000000,
+  WeighInClaims1788200000000,
+  CatalogNamesWithoutPrices1788300000000,
+  SignupRequests1788400000000,
 ];
 
 function assertAllMigrationsRegistered(): void {
