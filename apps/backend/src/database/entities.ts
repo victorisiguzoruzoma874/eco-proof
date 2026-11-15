@@ -1103,6 +1103,68 @@ export class CatalogRedemptionEntity {
   createdAt: Date;
 }
 
+export type SignupRole = "collector" | "operator";
+export type SignupStatus = "pending" | "approved" | "rejected" | "expired";
+
+/**
+ * Somebody asking to join as a collector or an operator.
+ *
+ * A separate table rather than an inactive `users` or `collectors` row: those
+ * tables only ever hold people a member of staff has let in, so no list, guard
+ * or payout query has to remember to filter out the unapproved. Approval
+ * creates the real row from this one and records which it was
+ * (`createdUserId` / `createdCollectorId`).
+ *
+ * `passwordHash` is held only while an operator request is pending — it is
+ * moved onto the user at approval and cleared on every other outcome. `hubId`
+ * is the hub a collector said they work from; `collectors` has no hub column,
+ * so this is where that answer lives.
+ */
+@Entity("signup_requests")
+export class SignupRequestEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column({ type: "varchar" })
+  role: SignupRole;
+
+  @Column()
+  name: string;
+
+  @Column()
+  phone: string;
+
+  /** Operators only. Stored trimmed and lower-cased, as `users.email` is. */
+  @Column({ nullable: true, type: "varchar" })
+  email: string | null;
+
+  @Column({ nullable: true, type: "text" })
+  passwordHash: string | null;
+
+  /** Collectors only. */
+  @Column({ nullable: true, type: "uuid" })
+  hubId: string | null;
+
+  @Index()
+  @Column({ type: "varchar", default: "pending" })
+  status: SignupStatus;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+
+  @Column({ nullable: true, type: "timestamptz" })
+  decidedAt: Date | null;
+
+  @Column({ nullable: true, type: "uuid" })
+  decidedByUserId: string | null;
+
+  @Column({ nullable: true, type: "uuid" })
+  createdUserId: string | null;
+
+  @Column({ nullable: true, type: "uuid" })
+  createdCollectorId: string | null;
+}
+
 export const ALL_ENTITIES = [
   HubEntity,
   CollectorEntity,
@@ -1125,4 +1187,5 @@ export const ALL_ENTITIES = [
   CatalogItemEntity,
   CatalogRedemptionEntity,
   WeighInClaimEntity,
+  SignupRequestEntity,
 ];
