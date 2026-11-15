@@ -387,6 +387,16 @@ select:focus-visible {
   --login-mascot-idle: 81px;
   display: flex;
   justify-content: center;
+  /*
+   * The slot is always the full height of the mascot, with the window growing
+   * up from its bottom edge, so the card below never moves. When the slot was
+   * only as tall as the window, pressing "Sign in" took focus off the fields,
+   * the mascot dropped, and the card slid up from under the pointer between
+   * mousedown and mouseup: the click landed on the page behind it and the
+   * first press of the button did nothing.
+   */
+  align-items: flex-end;
+  height: var(--login-mascot-full);
   margin-bottom: 0.75rem;
 }
 
@@ -420,21 +430,14 @@ select:focus-visible {
   }
 }
 
-.login-hover-scope:hover:not(:has(form:focus-within, form button:active)) .login-mascot-window {
+.login-hover-scope:hover:not(:has(.login-fields:focus-within)) .login-mascot-window {
   animation: login-mascot-peek 1.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Typing in either field (not the button) brings it all the way out and
    holds it there; moving focus off the fields — including by clicking
    "Sign in" — lets the transition above ease it back down into the can. */
-/*
- * The button counts too (focused, or being pressed in browsers that do not
- * focus a button on click). It used to be fields-only, which meant pressing
- * "Sign in" with a mouse dropped the mascot back to idle on mousedown: the
- * card jumped up from under the pointer, the click landed on the page behind
- * it, and the first press of the button did nothing.
- */
-.login-hover-scope:has(form:focus-within, form button:active) .login-mascot-window {
+.login-hover-scope:has(.login-fields:focus-within) .login-mascot-window {
   height: var(--login-mascot-full);
 }
 
@@ -2233,6 +2236,18 @@ label {
   font-size: var(--text-sm);
   color: var(--ink-soft);
   text-align: center;
+}
+
+/* The link between signing in and signing up is the way in for a new person,
+   so it reads as ink with an accent underline: the default accent-coloured
+   link is too faint on paper to carry that. */
+.signup-alt a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--accent-deep);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 .signup-done {

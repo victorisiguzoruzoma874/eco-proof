@@ -424,7 +424,14 @@ export class CreateSignupDto {
   @IsIn(["collector", "operator"])
   role: "collector" | "operator";
 
-  @IsString() @IsNotEmpty() @MaxLength(200) name: string;
+  // No control characters. Postgres cannot store a NUL in text, so a name
+  // carrying one would be hashed and then fail on insert: a 500 on a public
+  // route, and argon2 work that never counts toward the pending ceiling.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  @Matches(/^[^\u0000-\u001f\u007f]+$/, { message: "name must not contain control characters" })
+  name: string;
 
   @Matches(/^\+?[0-9]{7,15}$/, { message: "phone must be an E.164-style number" })
   phone: string;

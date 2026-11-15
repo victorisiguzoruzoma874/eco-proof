@@ -33,10 +33,10 @@ const operator = {
 };
 
 describe("SignupsController routes", () => {
-  it("POST /signups is public and rate limited to 20 per 600 seconds", () => {
+  it("POST /signups is public and rate limited to 300 per 600 seconds", () => {
     const handler = SignupsController.prototype.submit;
     expect(Reflect.getMetadata(IS_PUBLIC, handler)).toBe(true);
-    expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual({ limit: 20, windowSeconds: 600 });
+    expect(Reflect.getMetadata(RATE_LIMIT_KEY, handler)).toEqual({ limit: 300, windowSeconds: 600 });
   });
 
   it("the staff routes require admin or operator and are not public", () => {
@@ -105,6 +105,18 @@ describe("CreateSignupDto", () => {
     expect(validate({ ...collector, name: "" })).toEqual(["name"]);
     expect(validate({ ...collector, name: "x".repeat(201) })).toEqual(["name"]);
     expect(validate({ ...collector, hubId: "yaba" })).toEqual(["hubId"]);
+  });
+
+  it("rejects control characters in a name", () => {
+    // Postgres cannot store a NUL in text, so one that got this far would be
+    // hashed, fail on insert as a 500, and never count toward the ceiling.
+    expect(validate({ ...operator, name: "Tunde\u0000" })).toEqual(["name"]);
+    expect(validate({ ...collector, name: "Amina\nBello" })).toEqual(["name"]);
+    expect(validate({ ...collector, name: "Amina\u007f" })).toEqual(["name"]);
+  });
+
+  it("accepts names with accents, apostrophes and hyphens", () => {
+    expect(validate({ ...collector, name: "Chinụ̀a O'Brien-Adébáyọ̀" })).toEqual([]);
   });
 
   it("rejects fields the form never sends", () => {

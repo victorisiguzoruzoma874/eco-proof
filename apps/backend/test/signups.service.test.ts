@@ -202,6 +202,59 @@ describe("SignupsService.submit", () => {
     await expect(signups.submit(operator())).rejects.toThrow(ConflictException);
   });
 
+  it("the database itself refuses a second pending row for the same email", async () => {
+    await signups.submit(operator());
+
+    // Straight to the table, past the service's own check: this is the race
+    // two simultaneous submissions would otherwise win together.
+    await expect(
+      requests().insert({
+        role: "operator",
+        name: "Racer",
+        phone: "+2348000000001",
+        email: "tunde@example.com",
+        passwordHash: "x",
+        status: "pending",
+      }),
+    ).rejects.toThrow();
+    expect(await requests().count()).toBe(1);
+  });
+
+  it("the database itself refuses a second pending collector row for the same phone", async () => {
+    await signups.submit(collector());
+
+    await expect(
+      requests().insert({
+        role: "collector",
+        name: "Racer",
+        phone: "+2348012345678",
+        hubId: seeded.hub.id,
+        status: "pending",
+      }),
+    ).rejects.toThrow();
+    expect(await requests().count()).toBe(1);
+  });
+
+  it("the database lets a decided request share an email with a new pending one", async () => {
+    const first = await signups.submit(operator());
+    await requests().update({ id: first.id }, { status: "rejected" });
+
+    await expect(signups.submit(operator())).resolves.toMatchObject({ status: "pending" });
+    expect(await requests().count()).toBe(2);
+  });
+
+  it("the database refuses a request that names a hub that does not exist", async () => {
+    await expect(
+      requests().insert({
+        role: "collector",
+        name: "Orphan",
+        phone: "+2348000000002",
+        hubId: randomUUID(),
+        status: "pending",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("lets a rejected applicant sign up again", async () => {
     const first = await signups.submit(collector());
     await requests().update({ id: first.id }, { status: "rejected" });

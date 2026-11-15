@@ -1121,6 +1121,18 @@ export type SignupStatus = "pending" | "approved" | "rejected" | "expired";
  * so this is where that answer lives.
  */
 @Entity("signup_requests")
+// One pending request per email, and per collector phone. Partial, because a
+// decided request must not stop the same person signing up again. These are
+// what holds when two submissions arrive at the same instant; the names and
+// clauses match the SignupRequests migration exactly.
+@Index("IDX_signup_requests_pending_email", ["email"], {
+  unique: true,
+  where: `"status" = 'pending' AND "email" IS NOT NULL`,
+})
+@Index("IDX_signup_requests_pending_collector_phone", ["phone"], {
+  unique: true,
+  where: `"status" = 'pending' AND "role" = 'collector'`,
+})
 export class SignupRequestEntity {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -1145,7 +1157,11 @@ export class SignupRequestEntity {
   @Column({ nullable: true, type: "uuid" })
   hubId: string | null;
 
-  @Index()
+  @ManyToOne(() => HubEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({ name: "hubId", foreignKeyConstraintName: "FK_signup_requests_hub" })
+  hub?: HubEntity | null;
+
+  @Index("IDX_signup_requests_status")
   @Column({ type: "varchar", default: "pending" })
   status: SignupStatus;
 
@@ -1158,11 +1174,26 @@ export class SignupRequestEntity {
   @Column({ nullable: true, type: "uuid" })
   decidedByUserId: string | null;
 
+  @ManyToOne(() => UserEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({ name: "decidedByUserId", foreignKeyConstraintName: "FK_signup_requests_decided_by" })
+  decidedBy?: UserEntity | null;
+
   @Column({ nullable: true, type: "uuid" })
   createdUserId: string | null;
 
+  @ManyToOne(() => UserEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({ name: "createdUserId", foreignKeyConstraintName: "FK_signup_requests_created_user" })
+  createdUser?: UserEntity | null;
+
   @Column({ nullable: true, type: "uuid" })
   createdCollectorId: string | null;
+
+  @ManyToOne(() => CollectorEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({
+    name: "createdCollectorId",
+    foreignKeyConstraintName: "FK_signup_requests_created_collector",
+  })
+  createdCollector?: CollectorEntity | null;
 }
 
 export const ALL_ENTITIES = [

@@ -12,9 +12,10 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * The two partial unique indexes are the database's half of "one pending
  * request per email, and per collector phone". The service checks the same
  * thing first to give a readable message; the indexes are what holds when two
- * submissions arrive at the same instant. They exist only here, not on the
- * entity, because they cover pending rows only — a decided request must not
- * stop the same person signing up again.
+ * submissions arrive at the same instant. They cover pending rows only — a
+ * decided request must not stop the same person signing up again — and are
+ * declared with the same names and clauses on `SignupRequestEntity`, so a
+ * generated migration sees no difference.
  *
  * Additive only: a new table with no rows, so nothing existing changes.
  */

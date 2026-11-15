@@ -98,6 +98,34 @@ await page.screenshot({ path: `${SHOTS}/signup-01-login-link.png`, fullPage: tru
 await Promise.all([page.waitForURL(/\/signup/), link.click()]);
 await page.waitForLoadState("networkidle");
 
+// The card must not move under the pointer when "Sign in" is pressed. Typed
+// (a field has focus) and autofilled (nothing has focus) are different paths.
+async function signInClickLands(focusField) {
+  await page.goto(`${DASH}/login`, { waitUntil: "networkidle" });
+  if (focusField) {
+    await page.fill('input[name="email"]', "nobody@example.com");
+    await page.fill('input[name="password"]', "not the right password");
+  } else {
+    await page.evaluate(() => {
+      document.querySelector('input[name="email"]').value = "nobody@example.com";
+      document.querySelector('input[name="password"]').value = "not the right password";
+      document.activeElement?.blur?.();
+    });
+  }
+  const box = await page.locator('main button[type="submit"]').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  return page
+    .waitForURL(/error=1/, { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false);
+}
+check("a mouse press on Sign in works after typing", await signInClickLands(true));
+check("a mouse press on Sign in works with autofilled fields", await signInClickLands(false));
+await page.goto(`${DASH}/signup`, { waitUntil: "networkidle" });
+
 // ------------------------------------------------------------ 2. the page
 console.log("\n[2] The sign-up page");
 let text = await bodyText();

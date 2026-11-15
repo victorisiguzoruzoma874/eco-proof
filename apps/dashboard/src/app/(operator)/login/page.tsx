@@ -108,7 +108,7 @@ export default async function LoginPage({
         </section>
       </div>
 
-      <p style={{ marginTop: "1.5rem", fontSize: "var(--text-sm)", textAlign: "center" }}>
+      <p className="signup-alt" style={{ marginTop: "1.5rem" }}>
         New here? <Link href="/signup">Create an account</Link>
       </p>
 

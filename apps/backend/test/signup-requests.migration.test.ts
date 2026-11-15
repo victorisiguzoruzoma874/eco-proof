@@ -3,13 +3,13 @@ import { newDb } from "pg-mem";
 import { randomUUID } from "node:crypto";
 import { DataSource } from "typeorm";
 import { SignupRequests1788400000000 } from "../src/database/migrations/1788400000000-SignupRequests";
-import { ALL_ENTITIES } from "../src/database/entities";
+import { ALL_ENTITIES, SignupRequestEntity } from "../src/database/entities";
 
 /**
  * The sign-up queue is a new table, so the migration has to stand on its own:
  * a deployed database gets `signup_requests` from this SQL, never from the
- * entity. The suite builds the rest of the schema from the entities, removes
- * the table the entity produced, and lets the migration put it back.
+ * entity. The suite builds the rest of the schema from every other entity and
+ * lets the migration create this table on its own.
  */
 
 let dataSource: DataSource;
@@ -39,11 +39,10 @@ beforeEach(async () => {
 
   dataSource = await db.adapters.createTypeormDataSource({
     type: "postgres",
-    entities: ALL_ENTITIES,
+    entities: ALL_ENTITIES.filter((entity) => entity !== SignupRequestEntity),
   });
   await dataSource.initialize();
   await dataSource.synchronize();
-  await dataSource.query(`DROP TABLE "signup_requests"`);
 });
 
 afterAll(async () => {
@@ -71,6 +70,20 @@ describe("SignupRequests migration", () => {
     const rows: Array<{ status: string; email: string | null; passwordHash: string | null }> =
       await dataSource.query(`SELECT "status", "email", "passwordHash" FROM "signup_requests"`);
     expect(rows).toEqual([{ status: "pending", email: null, passwordHash: null }]);
+
+    // The same two rules the entity declares, enforced by the migration's own
+    // indexes: one pending request per collector phone, and a decided request
+    // does not block a new one.
+    await expect(
+      dataSource.query(
+        `INSERT INTO "signup_requests" ("role", "name", "phone") VALUES ('collector', 'Second', '+2348012345678')`,
+      ),
+    ).rejects.toThrow();
+    await dataSource.query(`UPDATE "signup_requests" SET "status" = 'rejected'`);
+    await dataSource.query(
+      `INSERT INTO "signup_requests" ("role", "name", "phone") VALUES ('collector', 'Second', '+2348012345678')`,
+    );
+    await dataSource.query(`DELETE FROM "signup_requests"`);
 
     await migration.down(runner);
     expect(await tableExists()).toBe(false);

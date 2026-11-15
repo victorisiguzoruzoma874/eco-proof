@@ -18,10 +18,12 @@ export class SignupsController {
 
   @Public()
   // The dashboard posts this from its server, so everyone signing up through
-  // the page shares one address: the limit is set where ordinary use never
-  // reaches it. What bounds a caller with many addresses is the ceiling on
-  // pending requests in SignupsService, not this.
-  @RateLimit(20, 600)
+  // the page shares one address, and refused attempts count as well as
+  // accepted ones. The limit therefore has to clear a hub's whole onboarding
+  // day arriving at once; it is a brake on a script, not a per-person quota.
+  // What bounds a caller with many addresses is the ceiling on pending
+  // requests in SignupsService, not this.
+  @RateLimit(300, 600)
   @Post()
   @HttpCode(201)
   @ApiOperation({ summary: "Ask to join as a collector or an operator" })
