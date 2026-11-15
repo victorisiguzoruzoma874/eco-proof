@@ -568,6 +568,24 @@ trusting the token — so there is no window where a revoked operator keeps
 working until their 12-hour token expires. The API refuses to deactivate or
 demote the last active admin, and refuses to let you do either to yourself.
 
+### Sign-ups
+
+Anyone can ask to join as a collector or an operator at `/signup` on the
+dashboard. Nothing is created until a member of staff decides the request at
+**Dashboard → More → Sign-ups**:
+
+- Admins approve or reject any request. Operators approve or reject collector
+  requests only.
+- Approving an operator creates their account; they sign in with the password
+  they chose. Approving a collector adds them to the roster, ready to be paired
+  to a phone from the Collectors page.
+- A request nobody decides within 14 days expires, and the person can sign up
+  again.
+- At most `SIGNUP_MAX_PENDING` requests (default 500) can be waiting at once.
+  Past that the page says sign-ups are paused; clear the queue to reopen it.
+
+No email or text is sent on a decision. Tell the applicant yourself.
+
 ### 6. Verify
 
 ```bash
