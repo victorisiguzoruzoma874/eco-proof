@@ -420,14 +420,21 @@ select:focus-visible {
   }
 }
 
-.login-hover-scope:hover:not(:has(.login-fields:focus-within)) .login-mascot-window {
+.login-hover-scope:hover:not(:has(form:focus-within, form button:active)) .login-mascot-window {
   animation: login-mascot-peek 1.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Typing in either field (not the button) brings it all the way out and
    holds it there; moving focus off the fields — including by clicking
    "Sign in" — lets the transition above ease it back down into the can. */
-.login-hover-scope:has(.login-fields:focus-within) .login-mascot-window {
+/*
+ * The button counts too (focused, or being pressed in browsers that do not
+ * focus a button on click). It used to be fields-only, which meant pressing
+ * "Sign in" with a mouse dropped the mascot back to idle on mousedown: the
+ * card jumped up from under the pointer, the click landed on the page behind
+ * it, and the first press of the button did nothing.
+ */
+.login-hover-scope:has(form:focus-within, form button:active) .login-mascot-window {
   height: var(--login-mascot-full);
 }
 
@@ -2105,4 +2112,190 @@ label {
   tbody tr {
     transition: none;
   }
+}
+
+/* ---------- sign-up ---------- */
+
+/*
+ * The one public page in the operator shell that is a front door, not a
+ * workspace: a welcome panel in the accent beside the form. Everything is the
+ * existing vocabulary (2px rule, hard shadow, accent, surface); only the split
+ * itself is new, and it collapses to a single column on a phone, where most
+ * collectors will be reading it.
+ */
+.signup {
+  max-width: 56rem;
+  margin: var(--space-10) auto 0;
+}
+
+.signup-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-hard);
+  background: var(--surface);
+}
+
+.signup-pitch {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-6);
+  background: var(--accent);
+  color: var(--on-accent);
+  border-right: 2px solid var(--rule);
+}
+
+.signup-pitch h1 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-metric);
+  line-height: 1.1;
+  color: inherit;
+}
+
+.signup-pitch p {
+  margin: 0;
+  font-size: var(--text-md);
+  color: inherit;
+}
+
+.signup-pitch-foot {
+  margin-top: var(--space-4) !important;
+  padding-top: var(--space-4);
+  border-top: 2px solid currentColor;
+  font-size: var(--text-sm) !important;
+}
+
+.signup-form {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-6);
+  min-width: 0;
+}
+
+.signup-form h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.signup-form .error,
+.signup-form .note {
+  margin: 0;
+}
+
+.signup-fields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Two links styled as one control: the page re-renders with the other field
+   set, so this needs no script and works before any has loaded. */
+.signup-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-md);
+}
+
+.signup-switch a {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.signup-switch a + a {
+  border-left: 2px solid var(--rule);
+}
+
+.signup-switch a:hover {
+  background: var(--paper-sunk);
+}
+
+.signup-switch a[aria-current="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.signup-hint {
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+
+.signup-alt {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.signup-done {
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+  background: var(--surface);
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-hard);
+}
+
+.signup-done p {
+  margin: var(--space-4) 0 0;
+}
+
+.signup-done .page-eyebrow {
+  margin: 0;
+}
+
+.signup-done-note {
+  padding: var(--space-3) var(--space-4);
+  background: var(--accent-bg);
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 720px) {
+  .signup {
+    margin-top: var(--space-6);
+  }
+
+  .signup-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .signup-pitch {
+    padding: var(--space-6);
+    border-right: 0;
+    border-bottom: 2px solid var(--rule);
+  }
+
+  .signup-form {
+    padding: var(--space-6);
+  }
+}
+
+/*
+ * The sign-up queue's "Reject" confirmation opens in the row, not as a
+ * popover over the table. The queue is usually one or two rows long, and a
+ * popover under the last row is clipped by `.table-wrap` (its `overflow-x:
+ * auto` makes the block axis scroll as well), which would hide the one
+ * question this page must not hide.
+ */
+.signups-table .confirm-body {
+  position: static;
+  width: 18rem;
+  max-width: 100%;
+  margin-left: auto;
+  box-shadow: none;
+}
+
+.signups-table td.col-actions .actions {
+  align-items: flex-start;
 }

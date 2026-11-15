@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { BACKEND_URL, TOKEN_COOKIE } from "@/lib/api";
 import { PageHeader } from "../_components/PageHeader";
 
@@ -51,7 +52,8 @@ export default async function LoginPage({
 
       {error ? (
         <p className="error" style={{ marginTop: 0, marginBottom: "1.25rem" }}>
-          Those credentials were not accepted.
+          Those credentials were not accepted. If you signed up recently, your account may still
+          be waiting for approval.
         </p>
       ) : signedOut ? (
         <p className="note" style={{ marginTop: 0, marginBottom: "1.25rem" }}>
@@ -105,6 +107,10 @@ export default async function LoginPage({
           </form>
         </section>
       </div>
+
+      <p style={{ marginTop: "1.5rem", fontSize: "var(--text-sm)", textAlign: "center" }}>
+        New here? <Link href="/signup">Create an account</Link>
+      </p>
 
       <p className="note" style={{ marginTop: "1.5rem" }}>
         Auditors get read-only access. Verification endpoints and audit reports stay public by
