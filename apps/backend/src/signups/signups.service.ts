@@ -1,21 +1,24 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
-import { DataSource, EntityManager, LessThanOrEqual, QueryFailedError } from "typeorm";
+import { DataSource, EntityManager, In, LessThanOrEqual, QueryFailedError } from "typeorm";
 import {
   CollectorEntity,
   HubEntity,
   SignupRequestEntity,
   UserEntity,
   type SignupRole,
+  type SignupStatus,
 } from "../database/entities";
-import { AuthService } from "../auth/auth.module";
+import { AuthService, type Role } from "../auth/auth.module";
 
 /**
  * People asking to join as a collector or an operator.
@@ -68,6 +71,31 @@ export interface SignupReceipt {
   status: "pending";
 }
 
+/** A request as staff see it — never the password hash. */
+export interface SignupView {
+  id: string;
+  role: SignupRole;
+  name: string;
+  phone: string;
+  email: string | null;
+  hubId: string | null;
+  hubName: string | null;
+  status: SignupStatus;
+  createdAt: string;
+}
+
+export interface SignupDecision {
+  signup: SignupView;
+  createdUserId: string | null;
+  createdCollectorId: string | null;
+}
+
+/** Who is deciding. The role comes from `JwtAuthGuard`, which re-reads the row. */
+export interface SignupActor {
+  sub: string;
+  role: Role;
+}
+
 const PENDING_EMAIL = "A sign-up with this email is already waiting for approval.";
 const PENDING_PHONE = "A sign-up with this phone number is already waiting for approval.";
 
@@ -117,6 +145,102 @@ export class SignupsService {
       }
       throw error;
     }
+  }
+
+  /** Requests still waiting for a decision that this member of staff may make. */
+  async listPending(actor: SignupActor): Promise<SignupView[]> {
+    const roles = decidableRoles(actor);
+
+    return this.dataSource.transaction(async (manager) => {
+      await this.expireStale(manager);
+
+      const rows = await manager.find(SignupRequestEntity, {
+        where: { status: "pending", role: In(roles) },
+        order: { createdAt: "ASC" },
+      });
+
+      const hubIds = [...new Set(rows.map((r) => r.hubId).filter((id): id is string => !!id))];
+      const hubs = hubIds.length ? await manager.find(HubEntity, { where: { id: In(hubIds) } }) : [];
+      const hubNames = new Map(hubs.map((h) => [h.id, h.name]));
+
+      return rows.map((row) => toView(row, row.hubId ? (hubNames.get(row.hubId) ?? null) : null));
+    });
+  }
+
+  /**
+   * Let an applicant in: create the real user or collector from the request.
+   *
+   * One transaction, with the request row locked, so two members of staff
+   * pressing Approve together produce one account and one "already approved",
+   * and so a request is never marked approved without the record it claims to
+   * have created.
+   */
+  async approve(id: string, actor: SignupActor): Promise<SignupDecision> {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const row = await this.lockPending(manager, id, actor);
+
+        if (row.role === "operator") {
+          // Both are always set on a pending operator request. The guard is
+          // there for the type checker and for a row edited by hand.
+          if (!row.email || !row.passwordHash) {
+            throw new ConflictException("This sign-up is incomplete and cannot be approved.");
+          }
+          if (await manager.findOne(UserEntity, { where: { email: row.email } })) {
+            throw new ConflictException(
+              "An account with this email now exists. Reject this sign-up or ask the applicant to use another email.",
+            );
+          }
+          const user = await manager.save(
+            manager.create(UserEntity, {
+              email: row.email,
+              passwordHash: row.passwordHash,
+              role: "operator",
+              active: true,
+            }),
+          );
+          row.createdUserId = user.id;
+          // The hash now lives on the user; a second copy here is one more
+          // place for it to leak from.
+          row.passwordHash = null;
+        } else {
+          if (await manager.findOne(CollectorEntity, { where: { phone: row.phone } })) {
+            throw new ConflictException(
+              "A collector with this phone number now exists. Reject this sign-up.",
+            );
+          }
+          const collector = await manager.save(
+            manager.create(CollectorEntity, {
+              name: row.name,
+              phone: row.phone,
+              cooperativeId: null,
+              kycLevel: "none",
+              active: true,
+            }),
+          );
+          row.createdCollectorId = collector.id;
+        }
+
+        return this.decide(manager, row, "approved", actor);
+      });
+    } catch (error) {
+      // Lost a race the row lock does not cover: the email or phone was taken
+      // by another route between the check above and the insert.
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          "This sign-up could not be approved because its email or phone number is now in use.",
+        );
+      }
+      throw error;
+    }
+  }
+
+  async reject(id: string, actor: SignupActor): Promise<SignupDecision> {
+    return this.dataSource.transaction(async (manager) => {
+      const row = await this.lockPending(manager, id, actor);
+      row.passwordHash = null;
+      return this.decide(manager, row, "rejected", actor);
+    });
   }
 
   private async operatorRequest(
@@ -174,7 +298,7 @@ export class SignupsService {
     }
 
     // Collectors authenticate by device key, so anything sent as an email or
-    // password is dropped rather than stored.
+    // password is dropped, never stored.
     return manager.create(SignupRequestEntity, {
       role: "collector",
       name,
@@ -187,13 +311,58 @@ export class SignupsService {
     });
   }
 
+  private async lockPending(
+    manager: EntityManager,
+    id: string,
+    actor: SignupActor,
+  ): Promise<SignupRequestEntity> {
+    const roles = decidableRoles(actor);
+    await this.expireStale(manager);
+
+    const row = await manager.findOne(SignupRequestEntity, {
+      where: { id },
+      lock: { mode: "pessimistic_write" },
+    });
+    if (!row) throw new NotFoundException(`sign-up ${id} not found`);
+
+    if (!roles.includes(row.role)) {
+      throw new ForbiddenException("Only an admin can decide operator sign-ups.");
+    }
+    if (row.status !== "pending") {
+      throw new ConflictException(`This sign-up has already been ${row.status}.`);
+    }
+    return row;
+  }
+
+  private async decide(
+    manager: EntityManager,
+    row: SignupRequestEntity,
+    status: "approved" | "rejected",
+    actor: SignupActor,
+  ): Promise<SignupDecision> {
+    row.status = status;
+    row.decidedAt = this.now();
+    row.decidedByUserId = actor.sub;
+    const saved = await manager.save(row);
+
+    const hub = saved.hubId
+      ? await manager.findOne(HubEntity, { where: { id: saved.hubId } })
+      : null;
+
+    return {
+      signup: toView(saved, hub?.name ?? null),
+      createdUserId: saved.createdUserId ?? null,
+      createdCollectorId: saved.createdCollectorId ?? null,
+    };
+  }
+
   /**
    * Retire requests nobody decided within `SIGNUP_EXPIRY_DAYS`.
    *
    * Run at the start of every operation instead of on a timer: there is no
    * scheduler in this service, and what matters is only that a stale request
-   * is never counted, listed, approved or allowed to block a new one — all of
-   * which pass through here first.
+   * is never counted, listed, approved or allowed to block a new one. All of
+   * those pass through here first.
    */
   private async expireStale(manager: EntityManager): Promise<void> {
     const cutoff = new Date(this.now().getTime() - SIGNUP_EXPIRY_DAYS * DAY_MS);
@@ -203,6 +372,34 @@ export class SignupsService {
       { status: "expired", passwordHash: null },
     );
   }
+}
+
+/**
+ * Which kinds of request this member of staff may see and decide.
+ *
+ * Admins decide everything. Operators decide collector requests only (they
+ * can already add a collector by hand, so this grants nothing new) and never
+ * operator requests, because minting an operator account is the ability to
+ * add weigh-ins to batches. Auditors are read-only everywhere and get nothing.
+ */
+function decidableRoles(actor: SignupActor): SignupRole[] {
+  if (actor.role === "admin") return ["collector", "operator"];
+  if (actor.role === "operator") return ["collector"];
+  throw new ForbiddenException("Sign-ups are reviewed by admins and operators.");
+}
+
+function toView(row: SignupRequestEntity, hubName: string | null): SignupView {
+  return {
+    id: row.id,
+    role: row.role,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    hubId: row.hubId,
+    hubName,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
 function isUniqueViolation(error: unknown): boolean {
