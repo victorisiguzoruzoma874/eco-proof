@@ -418,8 +418,53 @@ export interface CreditRate {
   createdAt: string;
 }
 
+export type SignupRole = "collector" | "operator";
+
+/** What somebody who has just signed up gets back: an acknowledgement, not an account. */
+export interface SignupReceipt {
+  id: string;
+  role: SignupRole;
+  name: string;
+  status: "pending";
+}
+
+/** A sign-up waiting for a member of staff to decide it. */
+export interface PendingSignup {
+  id: string;
+  role: SignupRole;
+  name: string;
+  phone: string;
+  /** Operators only. */
+  email: string | null;
+  /** Collectors only: the hub they said they work from. */
+  hubId: string | null;
+  hubName: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface SignupDecision {
+  signup: PendingSignup;
+  createdUserId: string | null;
+  createdCollectorId: string | null;
+}
+
 export const api = {
   me: () => request<CurrentUser>("/auth/me"),
+  /** Public: anyone may ask to join. Creates a pending request, never an account. */
+  submitSignup: (body: {
+    role: SignupRole;
+    name: string;
+    phone: string;
+    email?: string;
+    password?: string;
+    hubId?: string;
+  }) => request<SignupReceipt>("/signups", { method: "POST", body: JSON.stringify(body) }),
+  pendingSignups: () => request<PendingSignup[]>("/signups"),
+  approveSignup: (id: string) =>
+    request<SignupDecision>(`/signups/${id}/approve`, { method: "POST" }),
+  rejectSignup: (id: string) =>
+    request<SignupDecision>(`/signups/${id}/reject`, { method: "POST" }),
   materials: () => request<Material[]>("/materials"),
   createMaterial: (body: {
     code: string;

@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
  * Primary nav, on one line, with the rest behind "More" — and below 1120px the
  * whole thing behind one menu button.
  *
- * Eleven links do not fit on one row at any sane font size. Splitting by
+ * Twelve links do not fit on one row at any sane font size. Splitting by
  * frequency rather than alphabetically: the six an operator touches during a
  * shift stay visible, and configuration a hub sets up once lives in the
  * overflow. Below the breakpoint even six will not fit beside the wordmark and
@@ -27,6 +27,7 @@ const PRIMARY = [
 
 const MORE = [
   { href: "/collectors", label: "Collectors" },
+  { href: "/signups", label: "Sign-ups" },
   { href: "/material-rates", label: "Material rates" },
   { href: "/materials", label: "Materials" },
   { href: "/catalog-items", label: "Catalog items" },

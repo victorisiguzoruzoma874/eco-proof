@@ -16,3 +16,5 @@ infra/pgdata/
 e2e/screenshots/
 # Runtime artifacts: seeded device keypairs and uploaded photo evidence.
 var/
+# Brainstorm mockups and plan-execution scratch.
+.superpowers/

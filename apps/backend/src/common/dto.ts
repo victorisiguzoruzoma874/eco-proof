@@ -16,6 +16,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { CLAIM_CODE_PATTERN } from "../wallet/claim-code";
@@ -409,6 +410,50 @@ export class RegisterRequesterDto {
   @IsOptional()
   @Matches(/^\+?[0-9]{7,15}$/, { message: "phone must be an E.164-style number" })
   phone?: string;
+}
+
+/**
+ * A sign-up as a collector or an operator — a request to join, not an account
+ * (see `SignupsService`). One DTO for both roles because the form posts one
+ * body; which of the role-specific fields are required follows `role`.
+ *
+ * Only `collector` and `operator` are accepted. Auditor and admin accounts
+ * stay admin-created through `CreateUserDto`.
+ */
+export class CreateSignupDto {
+  @IsIn(["collector", "operator"])
+  role: "collector" | "operator";
+
+  // No control characters. Postgres cannot store a NUL in text, so a name
+  // carrying one would be hashed and then fail on insert: a 500 on a public
+  // route, and argon2 work that never counts toward the pending ceiling.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  @Matches(/^[^\u0000-\u001f\u007f]+$/, { message: "name must not contain control characters" })
+  name: string;
+
+  @Matches(/^\+?[0-9]{7,15}$/, { message: "phone must be an E.164-style number" })
+  phone: string;
+
+  @ValidateIf((o: CreateSignupDto) => o.role === "operator")
+  @IsEmail()
+  email?: string;
+
+  // Same floor and ceiling as every other password here: the floor for
+  // offline-cracking resistance, the ceiling because argon2 hashes the whole
+  // input on a route anyone can call.
+  @ValidateIf((o: CreateSignupDto) => o.role === "operator")
+  @IsString()
+  @MinLength(PASSWORD_MIN_LENGTH, {
+    message: `password must be at least ${PASSWORD_MIN_LENGTH} characters`,
+  })
+  @MaxLength(200)
+  password?: string;
+
+  @ValidateIf((o: CreateSignupDto) => o.role === "collector")
+  @IsUUID()
+  hubId?: string;
 }
 
 export class RequesterLoginDto {

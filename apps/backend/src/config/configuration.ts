@@ -43,6 +43,13 @@ export interface AppConfig {
    */
   maxPhotoBytes: number;
   maxClockSkewSeconds: number;
+  /**
+   * How many sign-up requests may be waiting for a decision at once. `POST
+   * /signups` is open to anyone, and each operator request costs an argon2
+   * hash and a row; past this the endpoint refuses until staff clear the queue
+   * or requests expire.
+   */
+  signupMaxPending: number;
 }
 
 export interface PhotoS3Config {
@@ -124,5 +131,6 @@ export function loadConfig(): AppConfig {
     photoS3: loadPhotoS3Config(),
     maxPhotoBytes: Number(process.env.MAX_PHOTO_BYTES ?? 8 * 1024 * 1024),
     maxClockSkewSeconds: Number(process.env.MAX_CLOCK_SKEW_SECONDS ?? 900),
+    signupMaxPending: Number(process.env.SIGNUP_MAX_PENDING ?? 500),
   };
 }

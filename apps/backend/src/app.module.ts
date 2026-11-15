@@ -30,6 +30,7 @@ import { WithdrawalsModule } from "./withdrawals/withdrawals.module";
 import { CatalogModule } from "./catalog/catalog.module";
 import { RateLimitGuard } from "./common/rate-limit.guard";
 import { AssistantModule } from "./assistant/assistant.module";
+import { SignupsModule } from "./signups/signups.module";
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { AssistantModule } from "./assistant/assistant.module";
     CreditRatesModule,
     WithdrawalsModule,
     CatalogModule,
+    SignupsModule,
   ],
   controllers: [RootController, AuthController, HealthController],
   providers: [

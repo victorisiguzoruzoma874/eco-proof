@@ -1103,6 +1103,99 @@ export class CatalogRedemptionEntity {
   createdAt: Date;
 }
 
+export type SignupRole = "collector" | "operator";
+export type SignupStatus = "pending" | "approved" | "rejected" | "expired";
+
+/**
+ * Somebody asking to join as a collector or an operator.
+ *
+ * A separate table rather than an inactive `users` or `collectors` row: those
+ * tables only ever hold people a member of staff has let in, so no list, guard
+ * or payout query has to remember to filter out the unapproved. Approval
+ * creates the real row from this one and records which it was
+ * (`createdUserId` / `createdCollectorId`).
+ *
+ * `passwordHash` is held only while an operator request is pending — it is
+ * moved onto the user at approval and cleared on every other outcome. `hubId`
+ * is the hub a collector said they work from; `collectors` has no hub column,
+ * so this is where that answer lives.
+ */
+@Entity("signup_requests")
+// One pending request per email, and per collector phone. Partial, because a
+// decided request must not stop the same person signing up again. These are
+// what holds when two submissions arrive at the same instant; the names and
+// clauses match the SignupRequests migration exactly.
+@Index("IDX_signup_requests_pending_email", ["email"], {
+  unique: true,
+  where: `"status" = 'pending' AND "email" IS NOT NULL`,
+})
+@Index("IDX_signup_requests_pending_collector_phone", ["phone"], {
+  unique: true,
+  where: `"status" = 'pending' AND "role" = 'collector'`,
+})
+export class SignupRequestEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column({ type: "varchar" })
+  role: SignupRole;
+
+  @Column()
+  name: string;
+
+  @Column()
+  phone: string;
+
+  /** Operators only. Stored trimmed and lower-cased, as `users.email` is. */
+  @Column({ nullable: true, type: "varchar" })
+  email: string | null;
+
+  @Column({ nullable: true, type: "text" })
+  passwordHash: string | null;
+
+  /** Collectors only. */
+  @Column({ nullable: true, type: "uuid" })
+  hubId: string | null;
+
+  @ManyToOne(() => HubEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({ name: "hubId", foreignKeyConstraintName: "FK_signup_requests_hub" })
+  hub?: HubEntity | null;
+
+  @Index("IDX_signup_requests_status")
+  @Column({ type: "varchar", default: "pending" })
+  status: SignupStatus;
+
+  @CreateDateColumn({ type: "timestamptz" })
+  createdAt: Date;
+
+  @Column({ nullable: true, type: "timestamptz" })
+  decidedAt: Date | null;
+
+  @Column({ nullable: true, type: "uuid" })
+  decidedByUserId: string | null;
+
+  @ManyToOne(() => UserEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({ name: "decidedByUserId", foreignKeyConstraintName: "FK_signup_requests_decided_by" })
+  decidedBy?: UserEntity | null;
+
+  @Column({ nullable: true, type: "uuid" })
+  createdUserId: string | null;
+
+  @ManyToOne(() => UserEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({ name: "createdUserId", foreignKeyConstraintName: "FK_signup_requests_created_user" })
+  createdUser?: UserEntity | null;
+
+  @Column({ nullable: true, type: "uuid" })
+  createdCollectorId: string | null;
+
+  @ManyToOne(() => CollectorEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({
+    name: "createdCollectorId",
+    foreignKeyConstraintName: "FK_signup_requests_created_collector",
+  })
+  createdCollector?: CollectorEntity | null;
+}
+
 export const ALL_ENTITIES = [
   HubEntity,
   CollectorEntity,
@@ -1125,4 +1218,5 @@ export const ALL_ENTITIES = [
   CatalogItemEntity,
   CatalogRedemptionEntity,
   WeighInClaimEntity,
+  SignupRequestEntity,
 ];
