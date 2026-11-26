@@ -9,7 +9,7 @@ import {
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Not, Repository } from "typeorm";
 import * as argon2 from "argon2";
-import { UserEntity } from "../database/entities";
+import { CollectorEntity, UserEntity } from "../database/entities";
 import { AuthService, type Role } from "../auth/auth.module";
 import type { CreateUserDto, UpdateUserDto } from "../common/dto";
 
@@ -22,8 +22,10 @@ import type { CreateUserDto, UpdateUserDto } from "../common/dto";
  * practical effect was that adding an operator to a deployed instance meant
  * opening psql and writing an argon2 hash by hand.
  *
- * Collectors are deliberately absent here: they authenticate by device key, not
- * password, and are managed through the registry.
+ * Collectors are managed through the registry. A collector who joined through
+ * the sign-up form also has a login here (role `collector`, see
+ * `SignupsService.approve`); admins can deactivate it, but never give it a
+ * staff role.
  */
 
 /** A user as the API returns it — never the password hash. */
@@ -51,6 +53,18 @@ export class UsersService {
     @InjectRepository(UserEntity) private readonly users: Repository<UserEntity>,
     @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
+
+  /** The collector a collector login speaks for, as `GET /auth/me` shows it. */
+  async collectorProfile(
+    userId: string,
+  ): Promise<{ id: string; name: string; phone: string } | null> {
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (!user?.collectorId) return null;
+    const collector = await this.dataSource
+      .getRepository(CollectorEntity)
+      .findOne({ where: { id: user.collectorId } });
+    return collector ? { id: collector.id, name: collector.name, phone: collector.phone } : null;
+  }
 
   async list(): Promise<UserView[]> {
     const rows = await this.users.find({ order: { createdAt: "ASC" } });
@@ -100,6 +114,15 @@ export class UsersService {
         lock: { mode: "pessimistic_write" },
       });
       if (!user) throw new NotFoundException(`user ${id} not found`);
+
+      // A collector login is tied to a collector record. Turning it into a
+      // staff account would hand a stranger who signed up off the street the
+      // powers of staff; create a separate staff account instead.
+      if (user.role === "collector" && dto.role !== undefined) {
+        throw new BadRequestException(
+          "a collector login cannot be given a staff role; create a separate staff account",
+        );
+      }
 
       const losingAdmin =
         user.role === "admin" &&

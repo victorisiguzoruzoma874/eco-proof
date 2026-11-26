@@ -75,6 +75,8 @@ function submitCollector() {
     role: "collector",
     name: "Amina Bello",
     phone: COLLECTOR_PHONE,
+    email: "amina@example.com",
+    password: PASSWORD,
     hubId: seeded.hub.id,
   });
 }
@@ -103,7 +105,7 @@ describe("SignupsService decisions", () => {
       status: "pending",
       createdAt: expect.any(String),
     });
-    expect(list[1]).toMatchObject({ role: "collector", hubId: seeded.hub.id, hubName: "Yaba Hub", email: null });
+    expect(list[1]).toMatchObject({ role: "collector", hubId: seeded.hub.id, hubName: "Yaba Hub", email: "amina@example.com" });
 
     const serialised = JSON.stringify(list);
     expect(serialised).not.toContain("passwordHash");
@@ -173,11 +175,20 @@ describe("SignupsService decisions", () => {
     expect(created.kycLevel).toBe("none");
     expect(created.active).toBe(true);
     expect(decision.createdCollectorId).toBe(created.id);
-    expect(decision.createdUserId).toBeNull();
+
+
+    // ...and a login for it, with the email and password they signed up with.
+    const login_ = await users().findOneByOrFail({ email: "amina@example.com" });
+    expect(login_.role).toBe("collector");
+    expect(login_.collectorId).toBe(created.id);
+    expect(decision.createdUserId).toBe(login_.id);
+    await expect(login("amina@example.com", PASSWORD)).resolves.toMatchObject({ role: "collector" });
 
     const row = await requests().findOneByOrFail({ id: col.id });
     expect(row.createdCollectorId).toBe(created.id);
     expect(row.hubId).toBe(seeded.hub.id);
+    // The hash now lives on the collector only.
+    expect(row.passwordHash).toBeNull();
   });
 
   it("forbids an operator from deciding an operator sign-up", async () => {

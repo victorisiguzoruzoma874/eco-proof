@@ -436,20 +436,20 @@ export class CreateSignupDto {
   @Matches(/^\+?[0-9]{7,15}$/, { message: "phone must be an E.164-style number" })
   phone: string;
 
-  @ValidateIf((o: CreateSignupDto) => o.role === "operator")
+  // Both roles: operators sign in with it, collectors have it stored on
+  // their record when approved.
   @IsEmail()
-  email?: string;
+  email: string;
 
   // Same floor and ceiling as every other password here: the floor for
   // offline-cracking resistance, the ceiling because argon2 hashes the whole
   // input on a route anyone can call.
-  @ValidateIf((o: CreateSignupDto) => o.role === "operator")
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH, {
     message: `password must be at least ${PASSWORD_MIN_LENGTH} characters`,
   })
   @MaxLength(200)
-  password?: string;
+  password: string;
 
   @ValidateIf((o: CreateSignupDto) => o.role === "collector")
   @IsUUID()

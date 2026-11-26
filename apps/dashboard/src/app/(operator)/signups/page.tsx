@@ -119,7 +119,7 @@ export default async function SignupsPage({
       <PageHeader {...HEADER} />
       <p className="page-intro">
         People who signed up and are waiting for a decision. Approving an operator lets them sign
-        in. Approving a collector adds them to the roster, ready to be paired to a phone.
+        in. Approving a collector adds them to the roster, ready to be paired to a phone, and lets them sign in to see their own account.
         {viewer.role === "operator"
           ? " You can decide collector sign-ups; operator sign-ups go to an admin."
           : null}

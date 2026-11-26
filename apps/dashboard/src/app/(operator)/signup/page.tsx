@@ -35,13 +35,14 @@ async function signUp(formData: FormData) {
     // Only the chosen role's fields: the backend refuses a body carrying
     // anything it does not expect.
     await api.submitSignup(
-      role === "operator" ? { role, name, phone, email, password } : { role, name, phone, hubId },
+      role === "operator"
+        ? { role, name, phone, email, password }
+        : { role, name, phone, email, password, hubId },
     );
   } catch (error) {
     // Everything but the password goes back so the form can be refilled.
-    const back = new URLSearchParams({ role, error: messageOf(error), name, phone });
-    if (role === "operator") back.set("email", email);
-    else back.set("hubId", hubId);
+    const back = new URLSearchParams({ role, error: messageOf(error), name, phone, email });
+    if (role === "collector") back.set("hubId", hubId);
     redirect(`/signup?${back.toString()}`);
   }
 
@@ -83,7 +84,8 @@ export default async function SignupPage({
           <h1 className="page-title">Thanks{params.done ? `, ${params.done}` : ""}</h1>
           <p>Your details are saved and your account is waiting for approval.</p>
           <p className="signup-done-note">
-            Operators can sign in once approved. Collectors will be paired to a phone at their hub.
+            Once approved, you can sign in with your email and password. Collectors will also be
+            paired to a phone at their hub.
           </p>
           <p>
             <Link href="/login">Back to sign in</Link>
@@ -152,18 +154,16 @@ export default async function SignupPage({
                 />
               </label>
 
-              {role === "operator" ? (
-                <label>
-                  Email
-                  <input
-                    name="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    defaultValue={params.email ?? ""}
-                  />
-                </label>
-              ) : null}
+              <label>
+                Email
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  defaultValue={params.email ?? ""}
+                />
+              </label>
 
               <label>
                 Phone number
@@ -179,23 +179,23 @@ export default async function SignupPage({
                 />
               </label>
 
-              {role === "operator" ? (
-                <label>
-                  Password
-                  <input
-                    name="password"
-                    type="password"
-                    required
-                    minLength={12}
-                    maxLength={200}
-                    autoComplete="new-password"
-                    aria-describedby="signup-password-hint"
-                  />
-                  <span id="signup-password-hint" className="signup-hint">
-                    At least 12 characters.
-                  </span>
-                </label>
-              ) : (
+              <label>
+                Password
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  minLength={12}
+                  maxLength={200}
+                  autoComplete="new-password"
+                  aria-describedby="signup-password-hint"
+                />
+                <span id="signup-password-hint" className="signup-hint">
+                  At least 12 characters.
+                </span>
+              </label>
+
+              {role === "collector" ? (
                 <label>
                   Your hub
                   <select name="hubId" required defaultValue={params.hubId ?? ""}>
@@ -209,7 +209,7 @@ export default async function SignupPage({
                     ))}
                   </select>
                 </label>
-              )}
+              ) : null}
 
               <button className="btn" data-variant="primary" type="submit">
                 Create account

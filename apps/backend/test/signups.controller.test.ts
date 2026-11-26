@@ -23,7 +23,14 @@ function validate(body: Record<string, unknown>): string[] {
 }
 
 const HUB_ID = "e8ec812e-8ad6-43ec-a7ef-17dc87c7e710";
-const collector = { role: "collector", name: "Amina Bello", phone: "+2348012345678", hubId: HUB_ID };
+const collector = {
+  role: "collector",
+  name: "Amina Bello",
+  phone: "+2348012345678",
+  email: "amina@example.com",
+  password: "correct horse battery",
+  hubId: HUB_ID,
+};
 const operator = {
   role: "operator",
   name: "Tunde Okafor",
@@ -71,7 +78,7 @@ describe("SignupsController routes", () => {
 });
 
 describe("CreateSignupDto", () => {
-  it("accepts a complete collector sign-up with no email or password", () => {
+  it("accepts a complete collector sign-up with an email and password", () => {
     expect(validate(collector)).toEqual([]);
   });
 
@@ -81,6 +88,11 @@ describe("CreateSignupDto", () => {
 
   it("an operator sign-up without email or password fails validation", () => {
     const { email: _e, password: _p, ...rest } = operator;
+    expect(validate(rest).sort()).toEqual(["email", "password"]);
+  });
+
+  it("a collector sign-up without email or password fails validation", () => {
+    const { email: _e, password: _p, ...rest } = collector;
     expect(validate(rest).sort()).toEqual(["email", "password"]);
   });
 

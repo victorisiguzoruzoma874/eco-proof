@@ -26,6 +26,7 @@ import { DoorstepCollection1788100000000 } from "../../src/database/migrations/1
 import { WeighInClaims1788200000000 } from "../../src/database/migrations/1788200000000-WeighInClaims";
 import { CatalogNamesWithoutPrices1788300000000 } from "../../src/database/migrations/1788300000000-CatalogNamesWithoutPrices";
 import { SignupRequests1788400000000 } from "../../src/database/migrations/1788400000000-SignupRequests";
+import { CollectorLogins1788500000000 } from "../../src/database/migrations/1788500000000-CollectorLogins";
 
 /**
  * Migrations are listed as classes rather than as the `src/**\/migrations/*.ts`
@@ -61,6 +62,7 @@ const MIGRATIONS = [
   WeighInClaims1788200000000,
   CatalogNamesWithoutPrices1788300000000,
   SignupRequests1788400000000,
+  CollectorLogins1788500000000,
 ];
 
 function assertAllMigrationsRegistered(): void {

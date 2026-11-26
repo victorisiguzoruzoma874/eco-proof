@@ -10,7 +10,8 @@ import { cookies } from "next/headers";
  */
 
 export const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3000";
-export const TOKEN_COOKIE = "proofchain_token";
+import { TOKEN_COOKIE } from "./cookie-names";
+export { TOKEN_COOKIE };
 /**
  * A requester (self-registering consumer) is a different trust boundary from
  * an operator — its own JWT (`kind: "requester"`, see `RequesterAuthGuard`),
@@ -286,8 +287,11 @@ export interface Collector {
 export interface CurrentUser {
   id: string;
   email: string;
-  role: "admin" | "operator" | "auditor";
+  role: "admin" | "operator" | "auditor" | "collector";
+  /** Present only for a collector login. */
+  collector?: { id: string; name: string; phone: string } | null;
 }
+
 
 /** A capture device's own hub list — trimmed, and public (`GET /hubs/directory`). */
 export interface HubDirectoryEntry {
@@ -456,8 +460,8 @@ export const api = {
     role: SignupRole;
     name: string;
     phone: string;
-    email?: string;
-    password?: string;
+    email: string;
+    password: string;
     hubId?: string;
   }) => request<SignupReceipt>("/signups", { method: "POST", body: JSON.stringify(body) }),
   pendingSignups: () => request<PendingSignup[]>("/signups"),
