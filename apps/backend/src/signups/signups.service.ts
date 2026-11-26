@@ -55,10 +55,8 @@ export interface SubmitSignupInput {
   role: SignupRole;
   name: string;
   phone: string;
-  /** Operators only. */
-  email?: string;
-  /** Operators only. */
-  password?: string;
+  email: string;
+  password: string;
   /** Collectors only. */
   hubId?: string;
 }
@@ -141,7 +139,10 @@ export class SignupsService {
       // partial unique indexes are what stops the second, and this turns that
       // into the same message the check would have given.
       if (isUniqueViolation(error)) {
-        throw new ConflictException(input.role === "operator" ? PENDING_EMAIL : PENDING_PHONE);
+        // The email index covers both roles; the phone index only collectors.
+        throw new ConflictException(
+          input.role === "operator" || isEmailIndex(error) ? PENDING_EMAIL : PENDING_PHONE,
+        );
       }
       throw error;
     }
@@ -209,6 +210,14 @@ export class SignupsService {
               "A collector with this phone number now exists. Reject this sign-up.",
             );
           }
+          if (!row.email || !row.passwordHash) {
+            throw new ConflictException("This sign-up is incomplete and cannot be approved.");
+          }
+          if (await manager.findOne(UserEntity, { where: { email: row.email } })) {
+            throw new ConflictException(
+              "An account with this email now exists. Reject this sign-up or ask the applicant to use another email.",
+            );
+          }
           const collector = await manager.save(
             manager.create(CollectorEntity, {
               name: row.name,
@@ -218,7 +227,21 @@ export class SignupsService {
               active: true,
             }),
           );
+          // The collector's login: same email and password they signed up
+          // with. Role `collector` keeps it off every staff route; see
+          // JwtAuthGuard.
+          const user = await manager.save(
+            manager.create(UserEntity, {
+              email: row.email,
+              passwordHash: row.passwordHash,
+              role: "collector",
+              collectorId: collector.id,
+              active: true,
+            }),
+          );
           row.createdCollectorId = collector.id;
+          row.createdUserId = user.id;
+          row.passwordHash = null;
         }
 
         return this.decide(manager, row, "approved", actor);
@@ -249,9 +272,7 @@ export class SignupsService {
     name: string,
     phone: string,
   ): Promise<SignupRequestEntity> {
-    // Lower-cased for the same reason UsersService.create does it: sign-in
-    // looks the account up by lower-cased email.
-    const email = input.email?.trim().toLowerCase();
+    const email = normaliseEmail(input.email);
     if (!email || !input.password) {
       throw new BadRequestException("an operator sign-up needs an email and a password");
     }
@@ -282,6 +303,10 @@ export class SignupsService {
     phone: string,
   ): Promise<SignupRequestEntity> {
     if (!input.hubId) throw new BadRequestException("a collector sign-up needs a hub");
+    const email = normaliseEmail(input.email);
+    if (!email || !input.password) {
+      throw new BadRequestException("a collector sign-up needs an email and a password");
+    }
 
     if (!(await manager.findOne(HubEntity, { where: { id: input.hubId } }))) {
       throw new ConflictException("That hub is no longer available. Choose another hub.");
@@ -296,15 +321,20 @@ export class SignupsService {
     ) {
       throw new ConflictException(PENDING_PHONE);
     }
+    if (await manager.findOne(UserEntity, { where: { email } })) {
+      throw new ConflictException("An account with this email already exists.");
+    }
+    if (await manager.findOne(SignupRequestEntity, { where: { email, status: "pending" } })) {
+      throw new ConflictException(PENDING_EMAIL);
+    }
 
-    // Collectors authenticate by device key, so anything sent as an email or
-    // password is dropped, never stored.
+    // Hashed here, like an operator's: the plain password is never stored.
     return manager.create(SignupRequestEntity, {
       role: "collector",
       name,
       phone,
-      email: null,
-      passwordHash: null,
+      email,
+      passwordHash: await AuthService.hashPassword(input.password),
       hubId: input.hubId,
       status: "pending",
       createdAt: this.now(),
@@ -400,6 +430,22 @@ function toView(row: SignupRequestEntity, hubName: string | null): SignupView {
     status: row.status,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * Lower-cased for the same reason UsersService.create does it: sign-in looks
+ * an account up by lower-cased email.
+ */
+function normaliseEmail(email: string | undefined): string | undefined {
+  return email?.trim().toLowerCase() || undefined;
+}
+
+function isEmailIndex(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    (error.driverError as { constraint?: string } | undefined)?.constraint ===
+      "IDX_signup_requests_pending_email"
+  );
 }
 
 function isUniqueViolation(error: unknown): boolean {

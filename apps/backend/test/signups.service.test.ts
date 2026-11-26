@@ -44,6 +44,8 @@ function collector(overrides: Partial<SubmitSignupInput> = {}): SubmitSignupInpu
     role: "collector",
     name: "Amina Bello",
     phone: "+2348012345678",
+    email: "amina@example.com",
+    password: PASSWORD,
     hubId: seeded.hub.id,
     ...overrides,
   };
@@ -61,10 +63,8 @@ function operator(overrides: Partial<SubmitSignupInput> = {}): SubmitSignupInput
 }
 
 describe("SignupsService.submit", () => {
-  it("stores a collector sign-up as pending with its hub and no credentials", async () => {
-    const receipt = await signups.submit(
-      collector({ email: "ignored@example.com", password: PASSWORD }),
-    );
+  it("stores a collector sign-up as pending with its hub, a lower-cased email and an argon2 hash", async () => {
+    const receipt = await signups.submit(collector({ email: " Amina@Example.com " }));
 
     expect(receipt).toEqual({
       id: expect.any(String),
@@ -76,8 +76,30 @@ describe("SignupsService.submit", () => {
     const row = await requests().findOneByOrFail({ id: receipt.id });
     expect(row.status).toBe("pending");
     expect(row.hubId).toBe(seeded.hub.id);
-    expect(row.email).toBeNull();
-    expect(row.passwordHash).toBeNull();
+    expect(row.email).toBe("amina@example.com");
+    expect(row.passwordHash).toMatch(/^\$argon2id\$/);
+    expect(row.passwordHash).not.toContain(PASSWORD);
+  });
+
+  it("refuses a collector sign-up whose email is already pending", async () => {
+    await signups.submit(operator({ email: "amina@example.com" }));
+
+    await expect(signups.submit(collector())).rejects.toThrow(
+      new ConflictException("A sign-up with this email is already waiting for approval."),
+    );
+  });
+
+  it("refuses a collector sign-up whose email already belongs to an account", async () => {
+    await db.dataSource.getRepository(UserEntity).save({
+      email: "amina@example.com",
+      passwordHash: "x",
+      role: "operator",
+      active: true,
+    } as UserEntity);
+
+    await expect(signups.submit(collector())).rejects.toThrow(
+      new ConflictException("An account with this email already exists."),
+    );
   });
 
   it("stores an operator sign-up with a lower-cased email and an argon2 hash", async () => {

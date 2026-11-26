@@ -27,7 +27,7 @@ import { PendingAdminOps } from './pending';
 
 /** read: every staff role · ops-read/operate: operator+admin · admin-read/admin: admin only. */
 export type Tier = 'read' | 'ops-read' | 'operate' | 'admin-read' | 'admin';
-const TIERS: Record<Role, Tier[]> = { auditor: ['read'], operator: ['read', 'ops-read', 'operate'], admin: ['read', 'ops-read', 'operate', 'admin-read', 'admin'] };
+const TIERS: Record<Role, Tier[]> = { collector: [], auditor: ['read'], operator: ['read', 'ops-read', 'operate'], admin: ['read', 'ops-read', 'operate', 'admin-read', 'admin'] };
 export const STAFF_SCREENS = ['batches', 'weigh-ins', 'reweigh', 'payouts', 'requests', 'withdrawals', 'collectors', 'material-rates', 'materials', 'catalog-items', 'catalog-redemptions'] as const;
 const id = { type: 'string', format: 'uuid' }, ids = { type: 'array', items: id }, str = (maxLength: number) => ({ type: 'string', maxLength });
 const num = { type: 'number', minimum: 0 }, bool = { type: 'boolean' }, limit = { limit: { type: 'integer', minimum: 1, maximum: 50 } };

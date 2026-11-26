@@ -291,7 +291,11 @@ export class CustodyTransferEntity {
   createdAt: Date;
 }
 
-/** Operator/auditor login. Collectors authenticate by device key, not password. */
+/**
+ * Password login for staff, and for collectors who joined through the sign-up
+ * form. A collector's capture device still authenticates by device key; this
+ * row is only their way into the dashboard.
+ */
 @Entity("users")
 export class UserEntity {
   @PrimaryGeneratedColumn("uuid")
@@ -303,9 +307,21 @@ export class UserEntity {
   @Column("text")
   passwordHash: string;
 
-  /** operator runs the hub; auditor is read-only; admin manages enrolment. */
+  /**
+   * operator runs the hub; auditor is read-only; admin manages enrolment;
+   * collector may use only the routes that name it in `@Roles`.
+   */
   @Column({ type: "varchar", default: "operator" })
-  role: "admin" | "operator" | "auditor";
+  role: "admin" | "operator" | "auditor" | "collector";
+
+  /** The collector this login belongs to. Set exactly when role is `collector`. */
+  @Index("IDX_users_collector", { unique: true })
+  @Column({ nullable: true, type: "uuid" })
+  collectorId: string | null;
+
+  @ManyToOne(() => CollectorEntity, { nullable: true, onDelete: "RESTRICT" })
+  @JoinColumn({ name: "collectorId", foreignKeyConstraintName: "FK_users_collector" })
+  collector?: CollectorEntity | null;
 
   @Column({ default: true })
   active: boolean;
@@ -1146,7 +1162,7 @@ export class SignupRequestEntity {
   @Column()
   phone: string;
 
-  /** Operators only. Stored trimmed and lower-cased, as `users.email` is. */
+  /** Stored trimmed and lower-cased, as `users.email` is. */
   @Column({ nullable: true, type: "varchar" })
   email: string | null;
 

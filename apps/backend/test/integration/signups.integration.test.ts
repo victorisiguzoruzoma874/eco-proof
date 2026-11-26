@@ -72,7 +72,14 @@ function operator(email = "tunde@example.com") {
 }
 
 function collector(phone = "+2348012345678") {
-  return signups.submit({ role: "collector", name: "Amina Bello", phone, hubId });
+  return signups.submit({
+    role: "collector",
+    name: "Amina Bello",
+    phone,
+    email: `amina.${phone.slice(1)}@example.com`,
+    password: PASSWORD,
+    hubId,
+  });
 }
 
 describe("sign-ups on Postgres", () => {

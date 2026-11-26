@@ -26,7 +26,12 @@ const AUDITOR = { email: "auditor@proofchain.local", password: "auditor-dev-pass
 const STAFF_OPERATOR = { email: "operator@proofchain.local", password: "operator-dev-password" };
 
 const run = Date.now().toString().slice(-8);
-const collector = { name: `Amina Bello ${run}`, phone: `+23480${run}` };
+const collector = {
+  name: `Amina Bello ${run}`,
+  phone: `+23480${run}`,
+  email: `amina.${run}@example.com`,
+  password: "collector horse battery",
+};
 const operator = {
   name: `Tunde Okafor ${run}`,
   phone: `+23481${run}`,
@@ -75,6 +80,8 @@ async function submitCollector(person) {
   await page.goto(`${DASH}/signup?role=collector`, { waitUntil: "networkidle" });
   await page.fill('input[name="name"]', person.name);
   await page.fill('input[name="phone"]', person.phone);
+  await page.fill('input[name="email"]', person.email ?? `someone.${run}@example.com`);
+  await page.fill('input[name="password"]', person.password ?? "another horse battery");
   await page.selectOption('select[name="hubId"]', { index: 1 });
   await submitSignupForm();
 }
@@ -137,7 +144,8 @@ check(
 );
 check("says accounts are reviewed", text.includes("Every account is reviewed before it goes live."));
 check("collector is the default", (await page.locator('select[name="hubId"]').count()) === 1);
-check("collector form asks for no password", (await page.locator('input[name="password"]').count()) === 0);
+check("collector form asks for an email", (await page.locator('input[name="email"]').count()) === 1);
+check("collector form asks for a password", (await page.locator('input[name="password"]').count()) === 1);
 check("hub list has real hubs", (await page.locator('select[name="hubId"] option').count()) > 1);
 await page.screenshot({ path: `${SHOTS}/signup-02-collector.png`, fullPage: true });
 
@@ -210,6 +218,8 @@ await signIn(operator);
 text = await bodyText();
 check("unapproved operator cannot sign in", /\/login/.test(page.url()));
 check("the sign-in page explains why", text.includes("may still be waiting for approval"));
+await signIn(collector);
+check("unapproved collector cannot sign in", /\/login/.test(page.url()));
 await page.screenshot({ path: `${SHOTS}/signup-08-not-yet.png`, fullPage: true });
 
 await page.goto(`${DASH}/signups`, { waitUntil: "networkidle" });
@@ -283,6 +293,26 @@ console.log("\n[6] The approved operator signs in");
 await signIn(operator);
 check("approved operator reaches the dashboard", !/\/login/.test(page.url()), page.url());
 check("and is signed in", (await bodyText()).includes("Sign out"));
+await signOut();
+
+// ------------------------------------------------------------ 7. collector in
+console.log("\n[7] The approved collector signs in");
+await signIn(collector);
+check("approved collector lands on their own page", new URL(page.url()).pathname === "/collector", page.url());
+text = await bodyText();
+check("and sees their own account", text.includes(collector.name) && text.includes(collector.email));
+await page.screenshot({ path: `${SHOTS}/signup-12-collector-home.png`, fullPage: true });
+
+await page.goto(`${DASH}/batches`, { waitUntil: "networkidle" });
+check("a collector is sent away from staff screens", new URL(page.url()).pathname === "/collector", page.url());
+await page.goto(`${DASH}/signups`, { waitUntil: "networkidle" });
+check("including the sign-up queue", new URL(page.url()).pathname === "/collector", page.url());
+
+await Promise.all([
+  page.waitForURL((url) => url.pathname === "/login"),
+  page.click('main button:has-text("Sign out")'),
+]);
+check("a collector can sign out", (await bodyText()).includes("You have signed out."));
 
 await browser.close();
 

@@ -15,10 +15,13 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import * as argon2 from "argon2";
 import type { Request } from "express";
-import { UserEntity } from "../database/entities";
+import { CollectorEntity, UserEntity } from "../database/entities";
 import { loadConfig } from "../config/configuration";
 
-export type Role = "admin" | "operator" | "auditor";
+export type Role = "admin" | "operator" | "auditor" | "collector";
+
+/** Every role, for the few routes any signed-in account may use. */
+export const ALL_ROLES: Role[] = ["admin", "operator", "auditor", "collector"];
 
 export const IS_PUBLIC = "isPublic";
 /** Opt a route out of auth entirely (health, login, device ingest). */
@@ -134,10 +137,20 @@ export class JwtAuthGuard implements CanActivate {
      */
     const user = await this.users.findOne({
       where: { id: claims.sub },
-      select: { id: true, email: true, role: true, active: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        active: true,
+        collectorId: true,
+        collector: { id: true, active: true },
+      },
+      relations: { collector: true },
     });
 
-    if (!user || !user.active) {
+    // A collector login also stops working when its collector is deactivated.
+    const collectorInactive = user?.role === "collector" && !user.collector?.active;
+    if (!user || !user.active || collectorInactive) {
       throw new UnauthorizedException("account is no longer active");
     }
 
@@ -151,13 +164,23 @@ export class JwtAuthGuard implements CanActivate {
       throw new ForbiddenException(`requires role: ${required.join(" or ")}`);
     }
 
+    /*
+     * Many staff routes carry no `@Roles` at all, meaning "any staff member".
+     * A collector is not staff, so for them the default is reversed: a route
+     * is closed unless it names `collector` explicitly. A new staff route
+     * written without `@Roles` therefore stays closed to collectors.
+     */
+    if (user.role === "collector" && !required?.includes("collector")) {
+      throw new ForbiddenException("collector accounts cannot use this route");
+    }
+
     return true;
   }
 }
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity]),
+    TypeOrmModule.forFeature([UserEntity, CollectorEntity]),
     JwtModule.registerAsync({
       useFactory: () => {
         const config = loadConfig();

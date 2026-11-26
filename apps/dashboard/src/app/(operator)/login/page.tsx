@@ -21,7 +21,7 @@ async function signIn(formData: FormData) {
 
   if (!res.ok) redirect("/login?error=1");
 
-  const { accessToken } = (await res.json()) as { accessToken: string };
+  const { accessToken, role } = (await res.json()) as { accessToken: string; role: string };
 
   // httpOnly: the token must be unreachable from client JavaScript.
   (await cookies()).set(TOKEN_COOKIE, accessToken, {
@@ -32,7 +32,8 @@ async function signIn(formData: FormData) {
     maxAge: 60 * 60 * 12,
   });
 
-  redirect("/");
+  // Collectors are not staff and have their own page.
+  redirect(role === "collector" ? "/collector" : "/");
 }
 
 export default async function LoginPage({
@@ -113,6 +114,7 @@ export default async function LoginPage({
       </p>
 
       <p className="note" style={{ marginTop: "1.5rem" }}>
+        Approved collectors sign in here with the email and password they signed up with.
         Auditors get read-only access. Verification endpoints and audit reports stay public by
         design, because a buyer must be able to check our claims without an account.
       </p>
