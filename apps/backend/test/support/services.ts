@@ -62,6 +62,7 @@ export function buildRegistryService(dataSource: DataSource): RegistryService {
     dataSource.getRepository(CollectorEntity),
     dataSource.getRepository(DeviceEntity),
     dataSource.getRepository(HubEntity),
+    dataSource,
   );
 }
 

@@ -506,6 +506,9 @@ export const api = {
     cooperativeId?: string;
     kycLevel?: "none" | "basic" | "verified";
   }) => request<Collector>("/collectors", { method: "POST", body: JSON.stringify(body) }),
+  /** Admin only. Refused (409) for a collector with weigh-ins, payouts or requests. */
+  deleteCollector: (id: string) =>
+    request<{ id: string; name: string }>(`/collectors/${id}`, { method: "DELETE" }),
   recordReweigh: (eventId: string, body: { verifiedWeightKg: number; notes?: string }) =>
     request<EventReweigh>(`/events/${eventId}/reweigh`, {
       method: "POST",

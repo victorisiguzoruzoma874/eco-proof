@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
  * hub where every phone in the field enrols as the same person. Phone is
  * unique per collector (it doubles as their payout identity) and, like a
  * material code, is never edited once set: it is what a payout is paid to.
+ *
+ * Admins can delete a collector who has no history (no weigh-ins, payouts or
+ * assigned requests). The backend decides who qualifies; this page only asks
+ * first, because a delete cannot be undone.
  */
 
 async function addCollector(formData: FormData) {
@@ -41,6 +45,22 @@ async function addCollector(formData: FormData) {
   redirect(`/collectors?added=${encodeURIComponent(name)}`);
 }
 
+async function deleteCollector(formData: FormData) {
+  "use server";
+
+  const id = String(formData.get("id") ?? "");
+  let name: string;
+  try {
+    ({ name } = await api.deleteCollector(id));
+  } catch (error) {
+    redirect(`/collectors?error=${encodeURIComponent(messageOf(error))}`);
+  }
+
+  revalidatePath("/collectors");
+  revalidatePath("/requests");
+  redirect(`/collectors?deleted=${encodeURIComponent(name)}`);
+}
+
 function messageOf(error: unknown): string {
   if (error instanceof ApiError) {
     return error.detail ?? `Request failed (${error.status}).`;
@@ -51,9 +71,9 @@ function messageOf(error: unknown): string {
 export default async function CollectorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; added?: string }>;
+  searchParams: Promise<{ error?: string; added?: string; deleted?: string }>;
 }) {
-  const { error, added } = await searchParams;
+  const { error, added, deleted } = await searchParams;
 
   let collectors: Collector[];
   let viewer: CurrentUser | null = null;
@@ -97,6 +117,7 @@ export default async function CollectorsPage({
       {added ? (
         <p className="note">Added {added}. They can now be assigned a device or a request.</p>
       ) : null}
+      {deleted ? <p className="note">Deleted {deleted}, with their devices and login.</p> : null}
 
       <dl className="stats">
         <div className="stat">
@@ -117,7 +138,7 @@ export default async function CollectorsPage({
       {collectors.length === 0 ? (
         <p className="empty">No collectors yet.</p>
       ) : (
-        <CollectorTable collectors={collectors} />
+        <CollectorTable collectors={collectors} canDelete={viewer.role === "admin"} />
       )}
 
       {canEdit ? (
@@ -156,7 +177,13 @@ export default async function CollectorsPage({
   );
 }
 
-function CollectorTable({ collectors }: { collectors: Collector[] }) {
+function CollectorTable({
+  collectors,
+  canDelete,
+}: {
+  collectors: Collector[];
+  canDelete: boolean;
+}) {
   return (
     <div className="table-wrap">
       <table>
@@ -167,6 +194,7 @@ function CollectorTable({ collectors }: { collectors: Collector[] }) {
             <th>Cooperative</th>
             <th>KYC</th>
             <th>Status</th>
+            {canDelete ? <th className="col-actions">Actions</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -181,6 +209,28 @@ function CollectorTable({ collectors }: { collectors: Collector[] }) {
                   {c.active ? "active" : "inactive"}
                 </span>
               </td>
+              {canDelete ? (
+                <td className="col-actions">
+                  <details className="confirm">
+                    <summary className="btn" data-size="sm" aria-label={`Delete ${c.name}`}>
+                      Delete
+                    </summary>
+                    <form action={deleteCollector} className="confirm-body">
+                      <input type="hidden" name="id" value={c.id} />
+                      <p>
+                        Delete <strong>{c.name}</strong> permanently? Their devices and login go
+                        too. This cannot be undone. Collectors with weigh-ins, payouts or requests
+                        cannot be deleted.
+                      </p>
+                      <div className="actions">
+                        <button className="btn" data-variant="danger" type="submit">
+                          Yes, delete
+                        </button>
+                      </div>
+                    </form>
+                  </details>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
