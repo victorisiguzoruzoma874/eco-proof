@@ -1,8 +1,17 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
+import { DataSource, QueryFailedError, Repository } from "typeorm";
 import { publicKeyFromBase64 } from "@proofchain/shared";
-import { CollectorEntity, DeviceEntity, HubEntity } from "../database/entities";
+import {
+  CollectionEventEntity,
+  CollectionRequestEntity,
+  CollectorEntity,
+  DeviceEntity,
+  HubEntity,
+  PayoutEntity,
+  SignupRequestEntity,
+  UserEntity,
+} from "../database/entities";
 import type { CreateCollectorDto, CreateHubDto, EnrolDeviceDto } from "../common/dto";
 
 /** What a capture device is told about a hub. */
@@ -24,6 +33,7 @@ export class RegistryService {
     @InjectRepository(CollectorEntity) private readonly collectors: Repository<CollectorEntity>,
     @InjectRepository(DeviceEntity) private readonly devices: Repository<DeviceEntity>,
     @InjectRepository(HubEntity) private readonly hubs: Repository<HubEntity>,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {}
 
   listCollectors() {
@@ -43,6 +53,79 @@ export class RegistryService {
         active: true,
       }),
     );
+  }
+
+  /**
+   * Permanently delete a collector, with their devices and their login.
+   *
+   * Only a collector with no history can go. Weigh-ins and payouts are the
+   * verified record that batches, reports and payouts are built on, and a
+   * collection request names who was sent; deleting the collector behind any
+   * of them would leave that record pointing at nobody. Such a collector is
+   * refused with a 409 that says what they have.
+   *
+   * The collector row is locked first. Postgres makes an insert that
+   * references a locked row wait, so a weigh-in arriving mid-delete either
+   * lands before the counts below (and is counted) or fails its foreign key
+   * after the delete commits. The foreign keys are RESTRICT regardless, which
+   * the catch below turns into the same 409.
+   */
+  async deleteCollector(id: string): Promise<{ id: string; name: string }> {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const collector = await manager.findOne(CollectorEntity, {
+          where: { id },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!collector) throw new NotFoundException(`collector ${id} not found`);
+
+        const weighIns = await manager.count(CollectionEventEntity, { where: { collectorId: id } });
+        const payouts = await manager.count(PayoutEntity, { where: { collectorId: id } });
+        const requests = await manager.count(CollectionRequestEntity, {
+          where: { assignedCollectorId: id },
+        });
+        const history = [
+          plural(weighIns, "weigh-in"),
+          plural(payouts, "payout"),
+          plural(requests, "assigned collection request"),
+        ].filter((part): part is string => part !== null);
+        if (history.length > 0) {
+          throw new ConflictException(
+            `${collector.name} has ${joinList(history)} and cannot be deleted: ` +
+              "those records must keep pointing at the collector who made them.",
+          );
+        }
+
+        // The approved sign-up stays, as a record of the decision; it just no
+        // longer names a collector, or a login, that exists.
+        const login = await manager.findOne(UserEntity, { where: { collectorId: id } });
+        await manager.update(
+          SignupRequestEntity,
+          { createdCollectorId: id },
+          { createdCollectorId: null },
+        );
+        if (login) {
+          await manager.update(
+            SignupRequestEntity,
+            { createdUserId: login.id },
+            { createdUserId: null },
+          );
+          await manager.delete(UserEntity, { id: login.id });
+        }
+        await manager.delete(DeviceEntity, { collectorId: id });
+        await manager.delete(CollectorEntity, { id });
+
+        this.logger.log(`deleted collector ${id} (${collector.name})`);
+        return { id, name: collector.name };
+      });
+    } catch (error) {
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictException(
+          "This collector now has records that refer to them and cannot be deleted.",
+        );
+      }
+      throw error;
+    }
   }
 
   async enrolDevice(dto: EnrolDeviceDto) {
@@ -146,4 +229,20 @@ export class RegistryService {
     return this.hubs.save(hub);
   }
 
+}
+
+function plural(count: number, noun: string): string | null {
+  if (count === 0) return null;
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function joinList(parts: string[]): string {
+  return parts.length < 2 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    (error.driverError as { code?: string } | undefined)?.code === "23503"
+  );
 }

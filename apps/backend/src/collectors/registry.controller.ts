@@ -20,6 +20,14 @@ export class RegistryController {
     return this.registry.createCollector(dto);
   }
 
+  /** Admin only: removing a person from the roster is not an operator's call. */
+  @Roles("admin")
+  @Delete("collectors/:id")
+  @ApiOperation({ summary: "Permanently delete a collector who has no history" })
+  deleteCollector(@Param("id", ParseUUIDPipe) id: string) {
+    return this.registry.deleteCollector(id);
+  }
+
   @Get("devices")
   listDevices(
     @Query("collectorId") collectorId?: string,

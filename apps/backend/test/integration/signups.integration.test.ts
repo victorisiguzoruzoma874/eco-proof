@@ -3,8 +3,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ConflictException } from "@nestjs/common";
 import type { DataSource } from "typeorm";
 import { SignupsService } from "../../src/signups/signups.service";
+import { RegistryService } from "../../src/collectors/registry.service";
 import {
   CollectorEntity,
+  DeviceEntity,
   HubEntity,
   SignupRequestEntity,
   UserEntity,
@@ -163,5 +165,23 @@ describe("sign-ups on Postgres", () => {
     await signups.reject(first.id, admin());
 
     await expect(operator()).resolves.toMatchObject({ status: "pending" });
+  });
+
+  it("deletes an approved collector with their login, on the migrated schema", async () => {
+    const col = await collector();
+    const decision = await signups.approve(col.id, admin());
+    const registry = new RegistryService(
+      dataSource.getRepository(CollectorEntity),
+      dataSource.getRepository(DeviceEntity),
+      dataSource.getRepository(HubEntity),
+      dataSource,
+    );
+
+    await registry.deleteCollector(decision.createdCollectorId!);
+
+    expect(await dataSource.getRepository(CollectorEntity).countBy({ id: decision.createdCollectorId! })).toBe(0);
+    expect(await dataSource.getRepository(UserEntity).countBy({ id: decision.createdUserId! })).toBe(0);
+    const row = await requests().findOneByOrFail({ id: col.id });
+    expect(row).toMatchObject({ status: "approved", createdCollectorId: null, createdUserId: null });
   });
 });
